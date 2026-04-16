@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+dist/
+
+# Environment files (contains secrets - never commit)
+.env
+.env.local
+
+# Uploads (local storage - not relevant in Vercel)
+uploads/
+
+# Scratch / test scripts
+scratch/
+
+# Build output
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
