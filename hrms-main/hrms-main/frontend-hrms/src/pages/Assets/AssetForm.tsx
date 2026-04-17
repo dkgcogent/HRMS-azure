@@ -117,7 +117,7 @@ const AssetForm: React.FC = () => {
   const loadAsset = async (assetId: number) => {
     try {
       setLoading(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/assets/${assetId}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/assets/${assetId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
         },
@@ -205,7 +205,7 @@ const AssetForm: React.FC = () => {
       console.error('Error loading employees:', error);
       // Try direct API call as fallback
       try {
-        const directResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/employees`, {
+        const directResponse = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/employees`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
           },
@@ -244,7 +244,7 @@ const AssetForm: React.FC = () => {
 
     try {
       setCalculating(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/assets/calculate-depreciation`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/assets/calculate-depreciation`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -382,7 +382,7 @@ const AssetForm: React.FC = () => {
       let assetId = id;
       if (isEdit) {
         // Update
-        const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/assets/${id}`, {
+        const response = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/assets/${id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -396,7 +396,7 @@ const AssetForm: React.FC = () => {
         }
       } else {
         // Create
-        const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/assets`, {
+        const response = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/assets`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -418,7 +418,7 @@ const AssetForm: React.FC = () => {
           console.log('Deleting photos:', deletedPhotoIds);
           for (const photoId of deletedPhotoIds) {
             try {
-              const deleteResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/assets/${assetId}/photos/${photoId}`, {
+              const deleteResponse = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/assets/${assetId}/photos/${photoId}`, {
                 method: 'DELETE',
                 headers: {
                   'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
@@ -444,7 +444,7 @@ const AssetForm: React.FC = () => {
             formDataPhotos.append('photos', photo);
           });
 
-          const photoResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/assets/${assetId}/photos`, {
+          const photoResponse = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/assets/${assetId}/photos`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
@@ -759,7 +759,7 @@ const AssetForm: React.FC = () => {
                 {existingPhotos.map((photo) => (
                   <ImageListItem key={photo.id}>
                     <img 
-                      src={`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}${photo.photo_path}`} 
+                      src={`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}${photo.photo_path}`} 
                       alt={photo.photo_name || `Photo ${photo.id}`} 
                       loading="lazy"
                       onError={(e) => {

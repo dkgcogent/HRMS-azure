@@ -161,7 +161,7 @@ const CreateKPIForm: React.FC = () => {
 
   const loadCategories = React.useCallback(async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/kpi/categories`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/kpi/categories`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
         },
@@ -193,7 +193,7 @@ const CreateKPIForm: React.FC = () => {
   const loadKPI = React.useCallback(async (kpiId: number) => {
     try {
       setLoading(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/kpi/${kpiId}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/kpi/${kpiId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
         },
@@ -253,7 +253,7 @@ const CreateKPIForm: React.FC = () => {
       if (storedEmployeeId) {
         employeeId = parseInt(storedEmployeeId);
       } else {
-        const userResponse = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/auth/me`, {
+        const userResponse = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/auth/me`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
           },
@@ -269,7 +269,7 @@ const CreateKPIForm: React.FC = () => {
       if (!employeeId) return;
 
       // Check if KPI exists for this period by fetching all KPIs and filtering
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/kpi`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/kpi`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
         },
@@ -441,7 +441,7 @@ const CreateKPIForm: React.FC = () => {
 
       // Get employee ID from backend
       let employeeId: number | null = null;
-      const userRes = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/auth/me`, {
+      const userRes = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/auth/me`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` },
       });
       const userData = await userRes.json();
@@ -463,7 +463,7 @@ const CreateKPIForm: React.FC = () => {
       // For HR/Admin editing someone else's KPI, we need to know whose it is
       let targetEmployeeId = employeeId;
       if (isEdit && id) {
-        const kpiRes = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/kpi/${id}`, {
+        const kpiRes = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/kpi/${id}`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` },
         });
         const kpiResData = await kpiRes.json();
@@ -488,7 +488,7 @@ const CreateKPIForm: React.FC = () => {
 
       let kpiId = id;
       if (isEdit && id) {
-        const updateRes = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/kpi/${id}`, {
+        const updateRes = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/kpi/${id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -499,7 +499,7 @@ const CreateKPIForm: React.FC = () => {
         const updateResult = await updateRes.json();
         if (!updateResult.success) throw new Error(updateResult.message || 'Update failed');
       } else {
-        const createRes = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/kpi`, {
+        const createRes = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/kpi`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -523,12 +523,12 @@ const CreateKPIForm: React.FC = () => {
       // Forwarding logic
       if (forwardToHR) {
         // Fetch items again to get actual IDs for score submission
-        const fetchKpi = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/kpi/${kpiId}`, {
+        const fetchKpi = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/kpi/${kpiId}`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` },
         });
         const fetchedData = await fetchKpi.json();
 
-        const submitRes = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/kpi/${kpiId}/submit`, {
+        const submitRes = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/kpi/${kpiId}/submit`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

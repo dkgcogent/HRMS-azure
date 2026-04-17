@@ -71,7 +71,7 @@ const OfferLetterList: React.FC = () => {
     const fetchOfferLetters = async () => {
         try {
             setLoading(true);
-            const apiUrl = process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL || 'http://localhost:3004'}`;
+            const apiUrl = process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}`;
             const response = await axios.get(`${apiUrl}/api/offer-letters/list`);
             if (response.data.success) {
                 setOfferLetters(response.data.data);
@@ -85,7 +85,7 @@ const OfferLetterList: React.FC = () => {
 
     const fetchEmployees = async () => {
         try {
-            const apiUrl = process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL || 'http://localhost:3004'}`;
+            const apiUrl = process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}`;
             const response = await axios.get(`${apiUrl}/api/employees`);
             if (response.data.success) {
                 setEmployees(response.data.data.content || []);
@@ -115,7 +115,7 @@ const OfferLetterList: React.FC = () => {
             alert('PDF path not available');
             return;
         }
-        const apiUrl = process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL || 'http://localhost:3004'}`;
+        const apiUrl = process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}`;
         const filename = path.split(/[/\\]/).pop();
         if (filename) {
             const pdfUrl = `${apiUrl}/uploads/pdfs/${filename}`;
@@ -134,7 +134,7 @@ const OfferLetterList: React.FC = () => {
     const handleDeleteConfirm = async () => {
         if (idToDelete) {
             try {
-                const apiUrl = process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL || 'http://localhost:3004'}`;
+                const apiUrl = process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}`;
                 await axios.delete(`${apiUrl}/api/offer-letters/${idToDelete}`);
                 fetchOfferLetters();
             } catch (error) {
@@ -165,7 +165,7 @@ const OfferLetterList: React.FC = () => {
 
         try {
             setLoading(true);
-            const apiUrl = process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL || 'http://localhost:3004'}`;
+            const apiUrl = process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}`;
             await axios.put(`${apiUrl}/api/offer-letters/${selectedLetter.id}/status`, {
                 status: 'Sent',
                 employeeId: selectedEmployeeId

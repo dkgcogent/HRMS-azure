@@ -568,7 +568,7 @@ Best regards,
             {(selectedTemplate?.type === 'OFFER' || selectedTemplate?.name.toLowerCase().includes('offer')) && (
               <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center', borderBottom: '1px solid #eee', pb: 2 }}>
                 <img
-                  src={`${process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL || 'http://localhost:3004'}`}/uploads/assets/offer_header.png`}
+                  src={`${process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}`}/uploads/assets/offer_header.png`}
                   alt="Letter Header"
                   style={{ maxWidth: '100%', height: 'auto', maxHeight: '100px' }}
                   onError={(e) => {

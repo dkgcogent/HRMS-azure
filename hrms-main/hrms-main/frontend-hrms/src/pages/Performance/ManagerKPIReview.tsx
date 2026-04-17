@@ -106,7 +106,7 @@ const ManagerKPIReview: React.FC = () => {
         return;
       }
 
-      const apiUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/kpi/admin/review`;
+      const apiUrl = `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/kpi/admin/review`;
       console.log('[ManagerKPIReview] ====== Starting KPI Load ======');
       console.log('[ManagerKPIReview] API URL:', apiUrl);
       console.log('[ManagerKPIReview] Auth token present:', !!token);
@@ -146,11 +146,11 @@ const ManagerKPIReview: React.FC = () => {
           } catch (e) {
             console.error('[ManagerKPIReview] 404 Error text (not JSON):', errorText);
           }
-          errorMessage = `${detailedError}. Please verify: 1) Backend is running on ${process.env.REACT_APP_API_URL || 'http://localhost:3004'}, 2) Route /api/kpi/admin/review exists, 3) You are logged in as Admin user.`;
+          errorMessage = `${detailedError}. Please verify: 1) Backend is running on ${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}, 2) Route /api/kpi/admin/review exists, 3) You are logged in as Admin user.`;
         } else if (response.status === 500) {
           errorMessage = 'Server error. Please check backend logs and database connection.';
         } else if (response.status === 0 || response.status === 'undefined') {
-          errorMessage = `Cannot connect to backend server. Please ensure the backend is running on ${process.env.REACT_APP_API_URL || 'http://localhost:3004'}`;
+          errorMessage = `Cannot connect to backend server. Please ensure the backend is running on ${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}`;
         }
 
         try {
@@ -193,7 +193,7 @@ const ManagerKPIReview: React.FC = () => {
       let errorMessage = 'Failed to load KPIs';
 
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        errorMessage = `Cannot connect to backend server. Please ensure backend is running on ${process.env.REACT_APP_API_URL || 'http://localhost:3004'} and check browser console for details.`;
+        errorMessage = `Cannot connect to backend server. Please ensure backend is running on ${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')} and check browser console for details.`;
       } else if (error.message) {
         errorMessage = `Failed to load KPIs: ${error.message}`;
       } else {
@@ -267,7 +267,7 @@ const ManagerKPIReview: React.FC = () => {
       }));
 
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/kpi/${selectedKPI.id}/manager-review`,
+        `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/kpi/${selectedKPI.id}/manager-review`,
         {
           method: 'POST',
           headers: {

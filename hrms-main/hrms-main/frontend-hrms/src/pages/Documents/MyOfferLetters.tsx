@@ -38,7 +38,7 @@ const MyOfferLetters: React.FC = () => {
         if (!user?.employeeId) return;
         try {
             setLoading(true);
-            const apiUrl = process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL || 'http://localhost:3004'}`;
+            const apiUrl = process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}`;
             const response = await axios.get(`${apiUrl}/api/offer-letters/my-letters/${user.employeeId}`);
             if (response.data.success) {
                 setOfferLetters(response.data.data);
@@ -55,7 +55,7 @@ const MyOfferLetters: React.FC = () => {
     }, [user?.employeeId]);
 
     const handleView = async (letter: OfferLetter) => {
-        const apiUrl = process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL || 'http://localhost:3004'}`;
+        const apiUrl = process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}`;
         const filename = letter.pdf_path.split(/[/\\]/).pop();
         if (filename) {
             const pdfUrl = `${apiUrl}/uploads/pdfs/${filename}`;

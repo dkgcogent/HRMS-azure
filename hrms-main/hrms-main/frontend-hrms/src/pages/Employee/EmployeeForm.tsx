@@ -941,7 +941,7 @@ const EmployeeForm: React.FC = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 3 }}>
                   <Box sx={{ position: 'relative' }}>
                     <Avatar
-                      src={photoPreview || (typeof employee.photoPath === 'string' && employee.photoPath ? `${process.env.REACT_APP_API_URL || 'http://localhost:3004'}${employee.photoPath}` : undefined)}
+                      src={photoPreview || (typeof employee.photoPath === 'string' && employee.photoPath ? `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}${employee.photoPath}` : undefined)}
                       sx={{ width: 120, height: 120, border: '3px solid #e0e0e0' }}
                     >
                       {!photoPreview && !employee.photoPath && (

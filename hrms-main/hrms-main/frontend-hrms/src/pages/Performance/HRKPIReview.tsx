@@ -82,7 +82,7 @@ const HRKPIReview: React.FC = () => {
   const loadKPIs = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/kpi/hr/review`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/kpi/hr/review`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
         },
@@ -145,7 +145,7 @@ const HRKPIReview: React.FC = () => {
       }));
 
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/kpi/${selectedKPI.id}/manager-review`,
+        `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/kpi/${selectedKPI.id}/manager-review`,
         {
           method: 'POST',
           headers: {

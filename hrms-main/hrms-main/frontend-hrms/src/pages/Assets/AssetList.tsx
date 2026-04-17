@@ -89,7 +89,7 @@ const AssetList: React.FC = () => {
       if (statusFilter) params.append('status', statusFilter);
       if (searchTerm) params.append('search', searchTerm);
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/assets?${params.toString()}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/assets?${params.toString()}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
         },
@@ -173,7 +173,7 @@ const AssetList: React.FC = () => {
     if (!selectedAsset) return;
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/assets/${selectedAsset.id}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/assets/${selectedAsset.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
@@ -529,7 +529,7 @@ const AssetList: React.FC = () => {
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       {asset.primary_photo ? (
-                        <Avatar src={`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}${asset.primary_photo}`} variant="rounded" />
+                        <Avatar src={`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}${asset.primary_photo}`} variant="rounded" />
                       ) : (
                         <Avatar variant="rounded">{getCategoryIcon(asset.category)}</Avatar>
                       )}

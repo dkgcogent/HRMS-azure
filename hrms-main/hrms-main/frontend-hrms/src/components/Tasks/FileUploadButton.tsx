@@ -100,7 +100,7 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
   };
 
   const handleDownload = (file: TaskFile) => {
-    const url = `${process.env.REACT_APP_API_URL || 'http://localhost:3004'}${file.file_path}`;
+    const url = `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}${file.file_path}`;
     window.open(url, '_blank');
   };
 

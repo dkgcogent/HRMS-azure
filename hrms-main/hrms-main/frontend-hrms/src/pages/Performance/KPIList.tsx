@@ -51,7 +51,7 @@ const KPIList: React.FC = () => {
   const loadKPIs = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/kpi`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/kpi`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
         },

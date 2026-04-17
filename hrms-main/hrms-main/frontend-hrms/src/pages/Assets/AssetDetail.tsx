@@ -81,7 +81,7 @@ const AssetDetail: React.FC = () => {
   const loadAsset = async (assetId: number) => {
     try {
       setLoading(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}/api/assets/${assetId}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/assets/${assetId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
         },
@@ -212,7 +212,7 @@ const AssetDetail: React.FC = () => {
               {primaryPhoto ? (
                 <Box
                   component="img"
-                  src={`${process.env.REACT_APP_API_URL || 'http://localhost:3004'}${primaryPhoto.photo_path}`}
+                  src={`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}${primaryPhoto.photo_path}`}
                   alt={asset.name}
                   onError={(e) => {
                     console.error('Error loading primary photo:', primaryPhoto.photo_path);
@@ -472,7 +472,7 @@ const AssetDetail: React.FC = () => {
               return (
                 <ImageList cols={3} gap={16}>
                   {asset.photos.map((photo: any) => {
-                    const photoUrl = `${process.env.REACT_APP_API_URL || 'http://localhost:3004'}${photo.photo_path}`;
+                    const photoUrl = `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}${photo.photo_path}`;
                     console.log('Rendering photo:', { id: photo.id, path: photo.photo_path, url: photoUrl });
                     return (
                       <ImageListItem key={photo.id}>
