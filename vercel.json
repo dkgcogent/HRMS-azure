@@ -9,7 +9,7 @@
       "src": "hrms-main/hrms-main/frontend-hrms/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "buildCommand": "npm run build",
+        "buildCommand": "CI=false npm run build",
         "distDir": "build"
       }
     }
@@ -26,10 +26,6 @@
     {
       "source": "/ping",
       "destination": "hrms-main/hrms-main/backend-hrms/src/index.ts"
-    },
-    {
-      "source": "/((?!api|uploads|ping).*)",
-      "destination": "/$1"
     },
     {
       "source": "/((?!api|uploads|ping).*)",
