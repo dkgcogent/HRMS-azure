@@ -271,6 +271,6 @@ if (process.env.VERCEL !== '1') {
   });
 }
 
-// Export the Express API
-export default app;
+// Export the Express API for Vercel Serverless Functions
+module.exports = app;
 
