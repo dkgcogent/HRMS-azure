@@ -104,7 +104,43 @@ const BankList: React.FC = () => {
     setOpen(true);
   };
 
+  const validateForm = () => {
+    const errors: string[] = [];
+
+    if (!formData.name.trim()) errors.push('Bank name is required');
+    if (!formData.ifscCode.trim()) errors.push('IFSC code is required');
+    if (!formData.branchName.trim()) errors.push('Branch name is required');
+    if (!formData.address.trim()) errors.push('Address is required');
+
+    // Check for duplicate name or ifscCode
+    const duplicate = banks.find(bank =>
+      ((bank.name || '').toLowerCase() === (formData.name || '').toLowerCase() ||
+      (bank.ifscCode || '').toLowerCase() === (formData.ifscCode || '').toLowerCase()) &&
+      (!editingBank || bank.id !== editingBank.id)
+    );
+    if (duplicate) {
+      if ((duplicate.name || '').toLowerCase() === (formData.name || '').toLowerCase()) {
+        errors.push('Bank name already exists');
+      }
+      if ((duplicate.ifscCode || '').toLowerCase() === (formData.ifscCode || '').toLowerCase()) {
+        errors.push('IFSC code already exists');
+      }
+    }
+
+    return errors;
+  };
+
   const handleSave = async () => {
+    const validationErrors = validateForm();
+    if (validationErrors.length > 0) {
+      setSnackbar({
+        open: true,
+        message: 'Please fix the following errors:\n' + validationErrors.join('\n'),
+        severity: 'error'
+      });
+      return;
+    }
+
     try {
       if (editingBank) {
         await apiService.updateBank(editingBank.id!, formData);

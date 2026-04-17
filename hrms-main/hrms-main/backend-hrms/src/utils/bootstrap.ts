@@ -357,6 +357,68 @@ export async function ensureCoreTables() {
   `).catch((error: any) => {
     console.warn('Note: offer_letters table creation:', error.message);
   });
+
+  // hrms_document_types table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS hrms_document_types (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(100) NOT NULL,
+      description TEXT,
+      is_mandatory TINYINT(1) DEFAULT 0,
+      allowed_extensions VARCHAR(255) DEFAULT 'pdf,jpg,jpeg,png',
+      max_file_size_mb INT DEFAULT 5,
+      created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  `).catch((error: any) => {
+    console.warn('Note: document_types table creation:', error.message);
+  });
+
+  // hrms_employee_documents table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS hrms_employee_documents (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      employee_id INT NOT NULL,
+      document_type_id INT NOT NULL,
+      file_path VARCHAR(1000) NOT NULL,
+      file_name VARCHAR(255) NOT NULL,
+      reference VARCHAR(100),
+      uploaded_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_employee (employee_id),
+      INDEX idx_doc_type (document_type_id),
+      CONSTRAINT fk_doc_employee FOREIGN KEY (employee_id) REFERENCES hrms_employees(id) ON DELETE CASCADE,
+      CONSTRAINT fk_doc_type FOREIGN KEY (document_type_id) REFERENCES hrms_document_types(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  `).catch((error: any) => {
+    console.warn('Note: employee_documents table creation:', error.message);
+  });
+
+  // Seed default document types if none exist
+  const [docTypes]: any = await pool.query('SELECT id FROM hrms_document_types LIMIT 1');
+  if (docTypes.length === 0) {
+    await pool.query(`
+      INSERT INTO hrms_document_types (name, code, description, is_mandatory, allowed_extensions, max_file_size_mb) VALUES 
+      ('Aadhar Card', 'AADHAR', 'National ID Card', 1, 'pdf,jpg,jpeg,png', 5),
+      ('PAN Card', 'PAN', 'Tax Identification Card', 1, 'pdf,jpg,jpeg,png', 5),
+      ('Voter ID', 'VOTER', 'Voter Identification Card', 0, 'pdf,jpg,jpeg,png', 5),
+      ('Driving License', 'DL', 'Driving License', 0, 'pdf,jpg,jpeg,png', 5),
+      ('Educational Certificate', 'EDU', 'Highest degree certificate', 1, 'pdf,jpg,jpeg,png', 5),
+      ('Experience Letter', 'EXP', 'Previous employment relief letter', 0, 'pdf,jpg,jpeg,png', 5),
+      ('Passport', 'PASSPORT', 'Travel document', 0, 'pdf,jpg,jpeg,png', 5)
+    `);
+  }
+
+  // hrms_employee_qualifications table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS hrms_employee_qualifications (
+      employee_id INT NOT NULL,
+      qualification_id INT NOT NULL,
+      PRIMARY KEY (employee_id, qualification_id),
+      CONSTRAINT fk_qual_employee FOREIGN KEY (employee_id) REFERENCES hrms_employees(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  `).catch((error: any) => {
+    console.warn('Note: employee_qualifications table creation:', error.message);
+  });
 }
 
 

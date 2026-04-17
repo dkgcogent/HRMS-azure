@@ -102,7 +102,37 @@ const WorkLocationList: React.FC = () => {
     setOpen(true);
   };
 
+  const validateForm = () => {
+    const errors: string[] = [];
+    if (!formData.name.trim()) errors.push('Location name is required');
+    if (!formData.address.trim()) errors.push('Address is required');
+    if (!formData.city.trim()) errors.push('City is required');
+    if (!formData.state.trim()) errors.push('State is required');
+    if (!formData.pincode.trim()) errors.push('Pincode is required');
+
+    // Check for duplicate name
+    const duplicate = locations.find(loc =>
+      (loc.name || '').toLowerCase() === (formData.name || '').toLowerCase() &&
+      (!editingLocation || loc.id !== editingLocation.id)
+    );
+    if (duplicate) {
+      errors.push('Location name already exists');
+    }
+
+    return errors;
+  };
+
   const handleSave = async () => {
+    const validationErrors = validateForm();
+    if (validationErrors.length > 0) {
+      setSnackbar({
+        open: true,
+        message: 'Please fix the following errors:\n' + validationErrors.join('\n'),
+        severity: 'error'
+      });
+      return;
+    }
+
     try {
       if (editingLocation) {
         await apiService.updateWorkLocation(editingLocation.id!, formData);

@@ -108,7 +108,35 @@ const QualificationList: React.FC = () => {
     setOpen(true);
   };
 
+  const validateForm = () => {
+    const errors: string[] = [];
+    if (!formData.name.trim()) errors.push('Qualification name is required');
+    if (formData.name.length < 2) errors.push('Name must be at least 2 characters');
+    if (!formData.level) errors.push('Academic level is required');
+
+    // Check for duplicate name
+    const duplicate = qualifications.find(qualification =>
+      (qualification.name || '').toLowerCase() === (formData.name || '').toLowerCase() &&
+      (!editingQualification || qualification.id !== editingQualification.id)
+    );
+    if (duplicate) {
+      errors.push('Qualification name already exists');
+    }
+
+    return errors;
+  };
+
   const handleSave = async () => {
+    const validationErrors = validateForm();
+    if (validationErrors.length > 0) {
+      setSnackbar({
+        open: true,
+        message: 'Please fix the following errors:\n' + validationErrors.join('\n'),
+        severity: 'error'
+      });
+      return;
+    }
+
     try {
       if (editingQualification) {
         await apiService.updateQualification(editingQualification.id!, formData);

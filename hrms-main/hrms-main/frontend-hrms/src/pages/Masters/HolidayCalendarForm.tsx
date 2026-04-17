@@ -23,11 +23,9 @@ import {
   Alert,
   IconButton,
   Chip,
-  Grid,
   Card,
   CardContent,
   Fab,
-  Tooltip,
 } from '@mui/material';
 import {
   Add,
@@ -156,12 +154,7 @@ const HolidayCalendarForm: React.FC = () => {
     { id: 3, name: 'Bangalore Office', code: 'BLR', city: 'Bangalore', state: 'Karnataka' },
   ];
 
-  useEffect(() => {
-    fetchHolidays();
-    fetchWorkLocations();
-  }, [selectedYear]);
-
-  const fetchHolidays = async () => {
+  const fetchHolidays = React.useCallback(async () => {
     setLoading(true);
     try {
       // TODO: Implement API call
@@ -176,9 +169,9 @@ const HolidayCalendarForm: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedYear]);
 
-  const fetchWorkLocations = async () => {
+  const fetchWorkLocations = React.useCallback(async () => {
     try {
       // TODO: Implement API call
       setWorkLocations(sampleWorkLocations);
@@ -188,7 +181,12 @@ const HolidayCalendarForm: React.FC = () => {
         message: 'Failed to fetch work locations',
       });
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchHolidays();
+    fetchWorkLocations();
+  }, [fetchHolidays, fetchWorkLocations]);
 
   const handleCreateHoliday = () => {
     setFormData({

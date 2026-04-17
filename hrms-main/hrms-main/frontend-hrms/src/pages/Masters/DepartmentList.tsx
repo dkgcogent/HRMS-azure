@@ -104,7 +104,7 @@ const DepartmentList: React.FC = () => {
 
     // Check for duplicate code (excluding current department when editing)
     const duplicateCode = departments.find(dept =>
-      dept.code.toLowerCase() === formData.code.toLowerCase() &&
+      dept.code?.toLowerCase() === formData.code?.toLowerCase() &&
       (!editingDepartment || dept.id !== editingDepartment.id)
     );
     if (duplicateCode) {

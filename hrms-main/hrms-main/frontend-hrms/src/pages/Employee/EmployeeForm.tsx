@@ -371,7 +371,8 @@ const EmployeeForm: React.FC = () => {
     console.log('📎 Current documentTypeId:', documentTypeId);
     if (file) {
       // Get selected document type to validate against its allowed extensions and size
-      const selectedDocType = documentTypes.find(dt => dt.id === documentTypeId);
+      // Use == to handle potential string/number mismatch from Select value
+      const selectedDocType = documentTypes.find(dt => dt.id == documentTypeId);
       if (!selectedDocType) {
         console.log('❌ No document type selected!');
         setUploadError('Please select a document type first');
@@ -379,9 +380,9 @@ const EmployeeForm: React.FC = () => {
       }
 
       // Validate file extension
-      const allowedExtensions = selectedDocType.allowedExtensions
-        ?.split(',')
-        .map((ext: string) => ext.trim().toLowerCase()) || [];
+      const allowedExtensions = (selectedDocType.allowedExtensions || 'pdf,jpg,jpeg,png')
+        .split(',')
+        .map((ext: string) => ext.trim().toLowerCase());
       const fileExtension = file.name.split('.').pop()?.toLowerCase();
 
       if (!fileExtension || !allowedExtensions.includes(fileExtension)) {
@@ -464,14 +465,16 @@ const EmployeeForm: React.FC = () => {
     }
 
     // Get document type name
-    const docType = documentTypes.find(dt => dt.id === documentTypeId);
+    // Use == to handle potential string/number mismatch from Select value
+    const docType = documentTypes.find(dt => dt.id == documentTypeId);
     if (!docType) {
       setUploadError('Invalid document type selected');
       return;
     }
 
     // Check if this document type is already staged
-    const existingDoc = stagedDocuments.find(doc => doc.documentTypeId === documentTypeId);
+    // Use == to handle potential string/number mismatch from Select value
+    const existingDoc = stagedDocuments.find(doc => doc.documentTypeId == documentTypeId);
     if (existingDoc) {
       setUploadError(`A document of type "${docType.name}" is already added. Please remove it first if you want to replace it.`);
       return;
@@ -1543,21 +1546,6 @@ const EmployeeForm: React.FC = () => {
               <Grid item xs={12}>
                 <Typography variant="h6" gutterBottom>Qualifications</Typography>
 
-                {/* Debug info */}
-                <Box sx={{ mb: 2, p: 2, backgroundColor: '#f0f0f0', borderRadius: 1 }}>
-                  <Typography variant="caption" display="block">
-                    <strong>Debug Info:</strong>
-                  </Typography>
-                  <Typography variant="caption" display="block">
-                    Selected IDs: {JSON.stringify(employee.qualificationIds)}
-                  </Typography>
-                  <Typography variant="caption" display="block">
-                    Available Qualifications: {qualifications.map(q => `${q.id}:${q.name}`).join(', ')}
-                  </Typography>
-                  <Typography variant="caption" display="block">
-                    Matched Names: {employee.qualificationIds?.map(id => qualifications.find(q => q.id === id)?.name).join(', ')}
-                  </Typography>
-                </Box>
 
                 <FormControl fullWidth>
                   <InputLabel id="qualifications-label">Select Qualifications</InputLabel>

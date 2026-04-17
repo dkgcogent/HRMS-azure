@@ -13,5 +13,5 @@ export const PHOTOS_DIR = path.join(UPLOAD_BASE_DIR, 'photos');
 export const DOCUMENTS_DIR = path.join(UPLOAD_BASE_DIR, 'documents');
 
 // Assets directory
-export const ASSETS_DIR = path.join(UPLOAD_BASE_DIR, 'hrms_assets');
+export const ASSETS_DIR = path.join(UPLOAD_BASE_DIR, 'assets');
 

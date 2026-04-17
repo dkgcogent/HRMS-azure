@@ -92,6 +92,22 @@ const ProjectList: React.FC = () => {
         if (!formData.name.trim()) errors.push('Project name is required');
         if (formData.name.length < 2) errors.push('Project name must be at least 2 characters');
 
+        // Check for duplicate name or code
+        const duplicate = projects.find(project =>
+            ((project.name || '').toLowerCase() === (formData.name || '').toLowerCase() ||
+            (formData.code && (project.code || '').toLowerCase() === (formData.code || '').toLowerCase())) &&
+            (!editingProject || project.id !== editingProject.id)
+        );
+
+        if (duplicate) {
+            if ((duplicate.name || '').toLowerCase() === (formData.name || '').toLowerCase()) {
+                errors.push('Project name already exists');
+            }
+            if (formData.code && (duplicate.code || '').toLowerCase() === (formData.code || '').toLowerCase()) {
+                errors.push('Project code already exists');
+            }
+        }
+
         return errors;
     };
 

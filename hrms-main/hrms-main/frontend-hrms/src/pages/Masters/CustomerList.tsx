@@ -92,6 +92,22 @@ const CustomerList: React.FC = () => {
         if (!formData.name.trim()) errors.push('Customer name is required');
         if (formData.name.length < 2) errors.push('Customer name must be at least 2 characters');
 
+        // Check for duplicate name or code
+        const duplicate = customers.find(customer =>
+            ((customer.name || '').toLowerCase() === (formData.name || '').toLowerCase() ||
+            (formData.code && (customer.code || '').toLowerCase() === (formData.code || '').toLowerCase())) &&
+            (!editingCustomer || customer.id !== editingCustomer.id)
+        );
+
+        if (duplicate) {
+            if ((duplicate.name || '').toLowerCase() === (formData.name || '').toLowerCase()) {
+                errors.push('Customer name already exists');
+            }
+            if (formData.code && (duplicate.code || '').toLowerCase() === (formData.code || '').toLowerCase()) {
+                errors.push('Customer code already exists');
+            }
+        }
+
         return errors;
     };
 

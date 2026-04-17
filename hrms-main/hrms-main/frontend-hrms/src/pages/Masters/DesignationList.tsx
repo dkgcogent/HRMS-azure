@@ -143,7 +143,7 @@ const DesignationList: React.FC = () => {
 
     // Check for duplicate code within the same department
     const duplicateCode = designations.find(desig =>
-      desig.code?.toLowerCase() === formData.code.toLowerCase() &&
+      (desig.code || '').toLowerCase() === (formData.code || '').toLowerCase() &&
       desig.departmentId === formData.departmentId &&
       (!editingDesignation || desig.id !== editingDesignation.id)
     );

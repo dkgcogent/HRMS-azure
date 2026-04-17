@@ -207,7 +207,7 @@ export const createEmployee = async (req: Request, res: Response) => {
   console.log('Request Headers:', JSON.stringify(req.headers, null, 2));
   let {
     employeeId, firstName, middleName, lastName, gender, dateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoPath, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, joiningDate, status = 'ACTIVE', bankId, accountNumber, paymentModeId, customerId, projectId,
-    emergencyContactName, emergencyContactNumber, emergencyContactRelation, personalEmail, alternateNumber, maritalStatus, bloodGroup
+    emergencyContactName, emergencyContactNumber, emergencyContactRelation, personalEmail, alternateNumber, maritalStatus, bloodGroup, qualificationIds
   } = req.body;
 
   // Auto-generate employee ID if not provided
@@ -305,9 +305,20 @@ export const createEmployee = async (req: Request, res: Response) => {
       'INSERT INTO hrms_employees (employee_id, first_name, middle_name, last_name, gender, date_of_birth, mobile, email, work_email, address, city, state, pincode, photo_path, manpower_type_id, department_id, designation_id, work_location_id, shift_id, joining_date, status, bank_id, account_number, payment_mode_id, customer_id, project_id, emergency_contact_name, emergency_contact_number, emergency_contact_relation, personal_email, alternate_number, marital_status, blood_group) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       insertData
     );
-    console.log('=== DATABASE INSERTION SUCCESSFUL ===');
     console.log('Insert result:', result);
-    res.status(201).json({ success: true, message: 'Employee created successfully', id: result.insertId });
+    const newEmployeeId = result.insertId;
+
+    // Handle qualifications if provided
+    if (qualificationIds && Array.isArray(qualificationIds) && qualificationIds.length > 0) {
+      console.log('Saving qualifications for new employee:', qualificationIds);
+      const qualificationValues = qualificationIds.map((qId: number) => [newEmployeeId, qId]);
+      await pool.query(
+        'INSERT INTO hrms_employee_qualifications (employee_id, qualification_id) VALUES ?',
+        [qualificationValues]
+      );
+    }
+
+    res.status(201).json({ success: true, message: 'Employee created successfully', id: newEmployeeId });
   } catch (error: any) {
     console.error('Error creating employee:', error);
     console.error('Request Body:', req.body);
@@ -488,10 +499,12 @@ export const uploadEmployeeDocument = async (req: Request, res: Response) => {
     // diskPath is like: "D:\HRMS_Uploads\documents\file-123.pdf"
     // We need: "/uploads/documents/file-123.pdf"
 
-    // Extract the part after HRMS_Uploads
     const path = require('path');
-    const relativePath = diskPath.split('HRMS_Uploads')[1]; // Gets "\documents\file-123.pdf"
-    const webPath = '/uploads' + relativePath.replace(/\\/g, '/'); // Converts to "/uploads/documents/file-123.pdf"
+    const { UPLOAD_BASE_DIR } = require('../config/uploadConfig');
+
+    // Use path.relative to get the part after UPLOAD_BASE_DIR
+    const relativePath = path.relative(UPLOAD_BASE_DIR, diskPath); // Gets "documents\file-123.pdf"
+    const webPath = '/uploads/' + relativePath.replace(/\\/g, '/'); // Converts to "/uploads/documents/file-123.pdf"
 
     console.log('📤 Converted paths:', { diskPath, relativePath, webPath });
     console.log('📤 Inserting into database:', { employeeId, documentTypeId, webPath, fileName, reference });

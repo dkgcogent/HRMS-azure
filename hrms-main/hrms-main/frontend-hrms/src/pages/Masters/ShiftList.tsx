@@ -99,7 +99,7 @@ const ShiftList: React.FC = () => {
 
     // Check for duplicate name (excluding current shift when editing)
     const duplicateName = shifts.find(shift =>
-      shift.name.toLowerCase() === formData.name.toLowerCase() &&
+      (shift.name || '').toLowerCase() === (formData.name || '').toLowerCase() &&
       (!editingShift || shift.id !== editingShift.id)
     );
     if (duplicateName) {

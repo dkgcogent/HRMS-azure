@@ -95,7 +95,34 @@ const DocumentTypeList: React.FC = () => {
     setOpen(true);
   };
 
+  const validateForm = () => {
+    const errors: string[] = [];
+    if (!formData.name.trim()) errors.push('Document type name is required');
+    if (formData.name.length < 2) errors.push('Name must be at least 2 characters');
+
+    // Check for duplicate name
+    const duplicate = documentTypes.find(docType =>
+      (docType.name || '').toLowerCase() === (formData.name || '').toLowerCase() &&
+      (!editingDocumentType || docType.id !== editingDocumentType.id)
+    );
+    if (duplicate) {
+      errors.push('Document type name already exists');
+    }
+
+    return errors;
+  };
+
   const handleSave = async () => {
+    const validationErrors = validateForm();
+    if (validationErrors.length > 0) {
+      setSnackbar({
+        open: true,
+        message: 'Please fix the following errors:\n' + validationErrors.join('\n'),
+        severity: 'error'
+      });
+      return;
+    }
+
     try {
       if (editingDocumentType) {
         await apiService.updateDocumentType(editingDocumentType.id!, formData);

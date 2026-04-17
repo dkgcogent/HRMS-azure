@@ -3,11 +3,9 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 
-// Use the same upload base directory as configured in index.ts
-// For Windows: D:/HRMS_Uploads/assets
-// For development: relative path
-const UPLOAD_BASE_DIR = process.env.UPLOAD_BASE_DIR || 'D:/HRMS_Uploads';
-const uploadsDir = path.join(UPLOAD_BASE_DIR, 'hrms_assets');
+import { ASSETS_DIR } from '../config/uploadConfig';
+
+const uploadsDir = ASSETS_DIR;
 
 // Ensure uploads directory exists
 if (!fs.existsSync(uploadsDir)) {

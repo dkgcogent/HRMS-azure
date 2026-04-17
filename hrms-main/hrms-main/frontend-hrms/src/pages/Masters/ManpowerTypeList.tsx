@@ -111,9 +111,9 @@ const ManpowerTypeList: React.FC = () => {
 
     // Check for duplicate name (excluding current item when editing)
     // Trim whitespace and normalize case for accurate comparison
-    const normalizedNewName = formData.name.trim().toLowerCase();
+    const normalizedNewName = (formData.name || '').trim().toLowerCase();
     const duplicateName = manpowerTypes.find(type => {
-      const normalizedExistingName = type.name.trim().toLowerCase();
+      const normalizedExistingName = (type.name || '').trim().toLowerCase();
       return normalizedExistingName === normalizedNewName &&
         (!editingItem || type.id !== editingItem.id);
     });

@@ -90,7 +90,34 @@ const PaymentModeList: React.FC = () => {
     setOpen(true);
   };
 
+  const validateForm = () => {
+    const errors: string[] = [];
+    if (!formData.name.trim()) errors.push('Payment mode name is required');
+    if (formData.name.length < 2) errors.push('Name must be at least 2 characters');
+
+    // Check for duplicate name
+    const duplicate = paymentModes.find(mode =>
+      (mode.name || '').toLowerCase() === (formData.name || '').toLowerCase() &&
+      (!editingMode || mode.id !== editingMode.id)
+    );
+    if (duplicate) {
+      errors.push('Payment mode name already exists');
+    }
+
+    return errors;
+  };
+
   const handleSave = async () => {
+    const validationErrors = validateForm();
+    if (validationErrors.length > 0) {
+      setSnackbar({
+        open: true,
+        message: 'Please fix the following errors:\n' + validationErrors.join('\n'),
+        severity: 'error'
+      });
+      return;
+    }
+
     try {
       if (editingMode) {
         await apiService.updatePaymentMode(editingMode.id!, formData);
