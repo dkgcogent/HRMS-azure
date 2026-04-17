@@ -28,8 +28,16 @@
       "destination": "hrms-main/hrms-main/backend-hrms/src/index.ts"
     },
     {
+      "source": "/(static/.*)",
+      "destination": "/hrms-main/hrms-main/frontend-hrms/$1"
+    },
+    {
+      "source": "/(favicon\\.ico|manifest\\.json|logo192\\.png|logo512\\.png|robots\\.txt)",
+      "destination": "/hrms-main/hrms-main/frontend-hrms/$1"
+    },
+    {
       "source": "/((?!api|uploads|ping).*)",
-      "destination": "/index.html"
+      "destination": "/hrms-main/hrms-main/frontend-hrms/index.html"
     }
   ]
 }
