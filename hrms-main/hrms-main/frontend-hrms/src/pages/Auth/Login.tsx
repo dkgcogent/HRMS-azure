@@ -82,13 +82,12 @@ const Login: React.FC = () => {
 
       // Handle different error responses
       let errorMessage = '';
-      let errorJson: any = null;
       try {
         // Try to parse as JSON first
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
-          errorJson = await response.json();
-          errorMessage = errorJson.error || errorJson.message || 'Login failed';
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || 'Login failed';
         } else {
           errorMessage = await response.text();
         }
@@ -96,20 +95,9 @@ const Login: React.FC = () => {
         errorMessage = 'Failed to read error response';
       }
 
-      if (response.status === 0) {
+      // Check for specific error types
+      if (response.status === 0 || response.status >= 500) {
         setError(`Backend server is not responding. Please ensure the server is running on ${API_BASE_URL}`);
-        return;
-      }
-
-      if (response.status >= 500) {
-        try {
-          if (errorJson && (errorJson.code || errorJson.details)) {
-            console.error('Detailed Server Error:', errorJson);
-            setError(`Server Error (${response.status}): ${errorMessage} | Code: ${errorJson.code} | Details: ${JSON.stringify(errorJson.details)}`);
-            return;
-          }
-        } catch (e) {}
-        setError(`Server Error (${response.status}): ${errorMessage}`);
         return;
       }
 

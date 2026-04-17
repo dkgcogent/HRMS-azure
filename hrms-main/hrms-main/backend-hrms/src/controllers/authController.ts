@@ -61,7 +61,7 @@ export const login = async (req: Request, res: Response) => {
     if (err.code === 'ER_NO_SUCH_TABLE') {
       return res.status(500).json({ error: 'Database table not found. Please run database migrations.' });
     }
-    return res.status(500).json({ error: err.message || 'Internal server error', code: err.code, stack: err.stack, details: err });
+    return res.status(500).json({ error: err.message || 'Internal server error' });
   }
 };
 
