@@ -1,0 +1,39 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "hrms-main/hrms-main/backend-hrms/src/index.ts",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "hrms-main/hrms-main/frontend-hrms/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "buildCommand": "npm run build",
+        "distDir": "build"
+      }
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "hrms-main/hrms-main/backend-hrms/src/index.ts"
+    },
+    {
+      "source": "/uploads/(.*)",
+      "destination": "hrms-main/hrms-main/backend-hrms/src/index.ts"
+    },
+    {
+      "source": "/ping",
+      "destination": "hrms-main/hrms-main/backend-hrms/src/index.ts"
+    },
+    {
+      "source": "/((?!api|uploads|ping).*)",
+      "destination": "/$1"
+    },
+    {
+      "source": "/((?!api|uploads|ping).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
