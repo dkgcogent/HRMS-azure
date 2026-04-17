@@ -19,6 +19,7 @@ import recruitmentRoutes from './routes/recruitmentRoutes';
 import trainingRoutes from './routes/trainingRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
 import { testConnection } from './db';
+import pool from './db';
 import authRoutes from './routes/authRoutes';
 import { ensureCoreTables } from './utils/bootstrap';
 import { login } from './controllers/authController';
@@ -94,6 +95,14 @@ console.log(`[CORS] Allowed origins: ${allowedOrigins.join(', ')}`);
 app.use(bodyParser.json({ limit: '50mb' })); // Increased limit for signature images
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
+// Simple request logger
+app.use((req, res, next) => {
+  if (req.path !== '/api/health' && req.path !== '/ping') {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  }
+  next();
+});
+
 // Serve static files from uploads directory on D: drive
 // This serves files from UPLOAD_BASE_DIR at /uploads route
 // So /uploads/assets/filename.jpg maps to D:/HRMS_Uploads/assets/filename.jpg
@@ -158,11 +167,19 @@ app.get('/ping', (req, res) => {
 // Health check endpoint with database connectivity test
 app.get('/api/health', async (req, res) => {
   try {
-    const { testConnection } = await import('./db');
     await testConnection();
     res.json({
       status: 'ok',
       database: 'connected',
+      environment: {
+        vercel: !!(process.env.VERCEL || process.env.NOW_REGION),
+        node_env: process.env.NODE_ENV,
+        has_db_host: !!process.env.DB_HOST,
+        has_db_user: !!process.env.DB_USER,
+        has_db_pass: !!process.env.DB_PASSWORD,
+        has_db_name: !!process.env.DB_NAME,
+        db_host: process.env.DB_HOST ? `${process.env.DB_HOST.substring(0, 3)}...` : 'not set'
+      },
       timestamp: new Date().toISOString()
     });
   } catch (error: any) {
@@ -170,6 +187,10 @@ app.get('/api/health', async (req, res) => {
       status: 'error',
       database: 'disconnected',
       error: error.message,
+      env_check: {
+        has_db_host: !!process.env.DB_HOST,
+        has_db_user: !!process.env.DB_USER
+      },
       timestamp: new Date().toISOString()
     });
   }
@@ -264,7 +285,9 @@ const startServer = async () => {
   }
 };
 
-if (process.env.VERCEL !== '1') {
+const isVercel = process.env.VERCEL === '1' || !!process.env.NOW_REGION || !!process.env.VERCEL;
+
+if (!isVercel) {
   startServer().catch((error) => {
     console.error('Fatal error during server startup:', error);
     process.exit(1);

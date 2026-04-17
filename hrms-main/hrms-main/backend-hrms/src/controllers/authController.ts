@@ -1,10 +1,8 @@
 import { Request, Response } from 'express';
 import pool from '../db';
 import { AuthUser } from '../middleware/auth';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const bcrypt: any = require('bcryptjs');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const jwt: any = require('jsonwebtoken');
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const JWT_TTL = process.env.JWT_TTL || '8h';
@@ -16,9 +14,16 @@ export const login = async (req: Request, res: Response) => {
   }
 
   try {
-    await ensureUsersTable();
-    await seedDemoUsers();
-    await ensureAdminUser(); // make sure an admin account always exists
+    console.log(`[AUTH] Login attempt for username: ${username}`);
+
+    try {
+      await ensureUsersTable();
+      await seedDemoUsers();
+      await ensureAdminUser();
+    } catch (dbInitErr: any) {
+      console.error('[AUTH] Database initialization error:', dbInitErr);
+      // Continue anyway, as the tables might already exist
+    }
 
     const [rows]: any = await pool.query(
       'SELECT id, username, full_name, role, password_hash, employee_id, department_id FROM hrms_users WHERE username = ?',
@@ -28,10 +33,15 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
     const user = rows[0];
+    console.log(`[AUTH] Found user: ${user.username}, role: ${user.role}`);
+
     const matches = await bcrypt.compare(password, user.password_hash);
     if (!matches) {
+      console.warn(`[AUTH] Password mismatch for user: ${username}`);
       return res.status(401).json({ error: 'Invalid username or password' });
     }
+
+    console.log(`[AUTH] Password matched for user: ${username}`);
 
     const token = jwt.sign(
       {
@@ -53,15 +63,15 @@ export const login = async (req: Request, res: Response) => {
       employeeId: user.employee_id,
     });
   } catch (err: any) {
-    console.error('Login error:', err);
+    console.error('[AUTH] Login fatal error:', err);
     // More specific error messages
-    if (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT') {
-      return res.status(503).json({ error: 'Database connection failed. Please check database configuration.' });
+    if (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT' || err.code === 'PROTOCOL_CONNECTION_LOST') {
+      return res.status(503).json({ error: 'Database connection failed. Please check if your Azure MySQL DB allows access from Azure services.', detail: err.message });
     }
     if (err.code === 'ER_NO_SUCH_TABLE') {
-      return res.status(500).json({ error: 'Database table not found. Please run database migrations.' });
+      return res.status(500).json({ error: 'Database table not found. Table initialization might have failed.', detail: err.message });
     }
-    return res.status(500).json({ error: err.message || 'Internal server error' });
+    return res.status(500).json({ error: 'Server Error: ' + (err.message || 'Unknown error'), detail: err.stack });
   }
 };
 
