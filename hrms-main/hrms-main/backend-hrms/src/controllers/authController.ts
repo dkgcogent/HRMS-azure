@@ -52,7 +52,7 @@ export const login = async (req: Request, res: Response) => {
         employeeId: user.employee_id ?? null,
       },
       JWT_SECRET,
-      { expiresIn: JWT_TTL }
+      { expiresIn: JWT_TTL as any }
     );
 
     return res.json({

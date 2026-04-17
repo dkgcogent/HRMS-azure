@@ -294,6 +294,6 @@ if (!isVercel) {
   });
 }
 
-// Export the Express API
-export default app;
+// Export the Express API for Vercel
+module.exports = app;
 
