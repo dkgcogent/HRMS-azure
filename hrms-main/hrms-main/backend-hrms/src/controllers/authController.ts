@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import pool from '../db';
 import { AuthUser } from '../middleware/auth';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const bcrypt: any = require('bcrypt');
+const bcrypt: any = require('bcryptjs');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const jwt: any = require('jsonwebtoken');
 
