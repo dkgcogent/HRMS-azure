@@ -27,6 +27,7 @@ import {
     Send as SendIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL, IMAGE_BASE_URL } from '../../services/api';
 
 interface OfferLetterData {
     // Step 1: Candidate Details
@@ -287,8 +288,7 @@ const OfferLetterForm: React.FC = () => {
             setLoading(true);
 
             // Call backend API to generate PDF
-            const apiUrl = process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}`;
-            const response = await fetch(`${apiUrl}/api/offer-letters/generate`, {
+            const response = await fetch(`${API_BASE_URL}/api/offer-letters/generate`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -338,8 +338,7 @@ const OfferLetterForm: React.FC = () => {
 
         try {
             setLoading(true);
-            const apiUrl = process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}`;
-            const response = await fetch(`${apiUrl}/api/offer-letters/${generatedId}/status`, {
+            const response = await fetch(`${API_BASE_URL}/api/offer-letters/${generatedId}/status`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -705,7 +704,7 @@ const OfferLetterForm: React.FC = () => {
                                     <Box component="span" sx={{ fontSize: '0.75rem', fontWeight: 'normal', px: 1, py: 0.25, bgcolor: 'primary.main', color: 'white', borderRadius: 4 }}>Fixed</Box>
                                 </Typography>
                                 <img
-                                    src={`${process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}`}/uploads/assets/authorised_signatory.png`}
+                                    src={`${IMAGE_BASE_URL}/uploads/assets/authorised_signatory.png`}
                                     alt="Authorised Signatory"
                                     style={{ maxWidth: '150px', maxHeight: '60px', display: 'block', marginTop: '8px' }}
                                     onError={(e) => {
@@ -787,7 +786,7 @@ const OfferLetterForm: React.FC = () => {
                 {/* Header Image Preview */}
                 <Box sx={{ mb: 4, display: 'flex', justifyContent: 'center', borderBottom: '1px solid #eee', pb: 2 }}>
                     <img
-                        src={`${process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}`}/uploads/assets/offer_header.png`}
+                        src={`${IMAGE_BASE_URL}/uploads/assets/offer_header.png`}
                         alt="Offer Letter Header"
                         style={{ maxWidth: '100%', height: 'auto', maxHeight: '120px' }}
                         onError={(e) => {

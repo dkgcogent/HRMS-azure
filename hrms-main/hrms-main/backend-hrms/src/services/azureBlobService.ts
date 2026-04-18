@@ -105,3 +105,38 @@ export const getBlobUrl = (blobName: string, isPrivate: boolean = false): string
   
   return `${blockBlobClient.url}?${sasToken}`;
 };
+
+/**
+ * Fetch a blob as a Buffer (for internal backend use)
+ */
+export const getBlobBuffer = async (blobName: string): Promise<Buffer> => {
+  if (!blobServiceClient || !blobName) throw new Error('Blob service not initialized or invalid blob name');
+  
+  const cleanBlobName = blobName.startsWith('/') ? blobName.substring(1) : blobName;
+  const containerClient = blobServiceClient.getContainerClient(containerName);
+  const blockBlobClient = containerClient.getBlockBlobClient(cleanBlobName);
+  
+  const downloadResponse = await blockBlobClient.download(0);
+  
+  if (!downloadResponse.readableStreamBody) {
+    throw new Error(`Failed to download blob ${cleanBlobName}`);
+  }
+  
+  return await streamToBuffer(downloadResponse.readableStreamBody);
+};
+
+/**
+ * Helper to convert readable stream to buffer
+ */
+async function streamToBuffer(readableStream: NodeJS.ReadableStream): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    readableStream.on("data", (data) => {
+      chunks.push(data instanceof Buffer ? data : Buffer.from(data));
+    });
+    readableStream.on("end", () => {
+      resolve(Buffer.concat(chunks));
+    });
+    readableStream.on("error", reject);
+  });
+}

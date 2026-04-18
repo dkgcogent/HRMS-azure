@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { PDF_STORAGE_DIR, ASSETS_DIR } from '../config/uploadConfig';
 import pool from '../db';
+import { uploadBufferToBlob, getBlobUrl, getBlobBuffer } from '../services/azureBlobService';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 interface OfferLetterData {
@@ -93,7 +94,6 @@ export const generateOfferLetterPDF = async (req: Request, res: Response) => {
             margins: { top: 50, bottom: 50, left: 72, right: 72 }
         });
 
-        const { uploadBufferToBlob, getBlobUrl } = require('../services/azureBlobService');
         const buffers: Buffer[] = [];
         doc.on('data', buffers.push.bind(buffers));
 
@@ -111,12 +111,13 @@ export const generateOfferLetterPDF = async (req: Request, res: Response) => {
         // ==================== PAGE 1 ====================
 
         // Company Logo and Header
-        const headerImagePath = path.join(ASSETS_DIR, 'offer_header.png');
-        if (fs.existsSync(headerImagePath)) {
+        try {
+            const headerBuffer = await getBlobBuffer('assets/offer_header.png');
             // Center the header image
-            doc.image(headerImagePath, 50, 40, { width: 495 });
+            doc.image(headerBuffer, 50, 40, { width: 495 });
             doc.y = 120;
-        } else {
+        } catch (headerError) {
+            console.warn('Failed to load header image from Azure, using fallback:', headerError);
             // Fallback for missing image
             doc.fontSize(20)
                 .font('Helvetica-Bold')
@@ -354,14 +355,15 @@ export const generateOfferLetterPDF = async (req: Request, res: Response) => {
         doc.text('For Cogent Logistics Pvt Ltd', 72, page3Y + 200);
 
         // Authorised Signatory Signature
-        const signatorySignaturePath = path.join(ASSETS_DIR, 'authorised_signatory.png');
-        if (fs.existsSync(signatorySignaturePath)) {
+        try {
+            const signatoryBuffer = await getBlobBuffer('assets/authorised_signatory.png');
             // Place signature image above the text
-            doc.image(signatorySignaturePath, 72, page3Y + 215, { width: 120, height: 40 });
+            doc.image(signatoryBuffer, 72, page3Y + 215, { width: 120, height: 40 });
             doc.fontSize(10)
                 .font('Helvetica-Oblique')
                 .text('(Authorised Signatory)', 72, page3Y + 260);
-        } else {
+        } catch (signatoryError) {
+            console.warn('Failed to load signatory image from Azure, using fallback text:', signatoryError);
             doc.fontSize(10)
                 .font('Helvetica-Oblique')
                 .text('(Authorised Signatory)', 72, page3Y + 260);
