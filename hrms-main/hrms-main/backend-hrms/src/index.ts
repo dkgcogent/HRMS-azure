@@ -161,39 +161,68 @@ app.get('/', (req, res) => {
 });
 
 app.get('/ping', (req, res) => {
-  res.send('pong');
+  res.json({ status: 'ok', message: 'pong', timestamp: new Date().toISOString(), platform: process.env.VERCEL ? 'Vercel' : 'Local' });
+});
+
+app.get('/api/ping', (req, res) => {
+  res.json({ status: 'ok', message: 'pong', timestamp: new Date().toISOString() });
 });
 
 // Health check endpoint with database connectivity test
 app.get('/api/health', async (req, res) => {
   try {
-    await testConnection();
+    const dbStatus = await Promise.race([
+      testConnection().then(() => 'connected'),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Database connection timeout')), 5000))
+    ]);
+    
     res.json({
       status: 'ok',
-      database: 'connected',
+      database: dbStatus,
       environment: {
         vercel: !!(process.env.VERCEL || process.env.NOW_REGION),
         node_env: process.env.NODE_ENV,
         has_db_host: !!process.env.DB_HOST,
         has_db_user: !!process.env.DB_USER,
         has_db_pass: !!process.env.DB_PASSWORD,
-        has_db_name: !!process.env.DB_NAME,
+        has_db_name: !!process.env.DB_DATABASE || !!process.env.DB_NAME,
         db_host: process.env.DB_HOST ? `${process.env.DB_HOST.substring(0, 3)}...` : 'not set'
       },
       timestamp: new Date().toISOString()
     });
   } catch (error: any) {
+    console.error('[HEALTH] Error:', error.message);
     res.status(503).json({
       status: 'error',
       database: 'disconnected',
       error: error.message,
       env_check: {
         has_db_host: !!process.env.DB_HOST,
-        has_db_user: !!process.env.DB_USER
+        has_db_user: !!process.env.DB_USER,
+        has_db_pass: !!process.env.DB_PASSWORD,
+        has_db_name: !!process.env.DB_DATABASE || !!process.env.DB_NAME
       },
       timestamp: new Date().toISOString()
     });
   }
+});
+
+// Environment check endpoint (safe)
+app.get('/api/env-check', (req, res) => {
+  res.json({
+    vercel: !!process.env.VERCEL,
+    node_env: process.env.NODE_ENV,
+    required_vars: {
+      DB_HOST: !!process.env.DB_HOST,
+      DB_USER: !!process.env.DB_USER,
+      DB_PASSWORD: !!process.env.DB_PASSWORD,
+      DB_NAME: !!(process.env.DB_DATABASE || process.env.DB_NAME),
+      JWT_SECRET: !!process.env.JWT_SECRET,
+      PORT: process.env.PORT || 'using default'
+    },
+    timezone: process.env.TZ || 'not set',
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Fallback direct mount to ensure auth is reachable

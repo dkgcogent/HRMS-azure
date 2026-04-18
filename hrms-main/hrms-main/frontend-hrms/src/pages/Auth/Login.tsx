@@ -96,8 +96,13 @@ const Login: React.FC = () => {
       }
 
       // Check for specific error types
-      if (response.status === 0 || response.status >= 500) {
-        setError(`Backend server is not responding. Please ensure the server is running on ${API_BASE_URL}`);
+      if (response.status === 0) {
+        setError(`Cannot reach backend server. Please ensure the server is running on ${API_BASE_URL}`);
+        return;
+      }
+
+      if (response.status >= 500) {
+        setError(errorMessage ? `Server Error: ${errorMessage}` : `Backend server error (${response.status}). Please check server logs.`);
         return;
       }
 
