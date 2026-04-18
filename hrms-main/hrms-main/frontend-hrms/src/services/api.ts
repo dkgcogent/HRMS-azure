@@ -3,13 +3,12 @@ import axios from 'axios';
 // API Base URL
 // API Base URL
 const rawApiUrl = process.env.REACT_APP_API_URL;
-// If same-origin ('/'), use '/api' as the base to hit the Vercel backend rewrite
-export const API_BASE_URL = rawApiUrl === '/' ? '/api' : (rawApiUrl ? rawApiUrl.replace(/\/$/, '') : 'http://localhost:3004');
+// For axios, use '' if same-origin so /api/... results in root-relative /api/...
+export const API_BASE_URL = rawApiUrl === '/' ? '' : (rawApiUrl ? rawApiUrl.replace(/\/$/, '') : 'http://localhost:3004');
 
 // Base URL for images
-// We use the same base for images as for the API because all backend communication 
-// must go through the /api rewrite on Vercel production.
-export const IMAGE_BASE_URL = API_BASE_URL;
+// Static images need the '/api' prefix to correctly trigger the Vercel backend rewrite.
+export const IMAGE_BASE_URL = rawApiUrl === '/' ? '/api' : (rawApiUrl ? rawApiUrl.replace(/\/$/, '') : 'http://localhost:3004');
 
 // Create axios instance
 const api = axios.create({
