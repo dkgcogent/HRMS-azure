@@ -17,15 +17,15 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "hrms-main/hrms-main/backend-hrms/src/index.ts"
+      "destination": "/hrms-main/hrms-main/backend-hrms/src/index.ts"
     },
     {
       "source": "/uploads/(.*)",
-      "destination": "hrms-main/hrms-main/backend-hrms/src/index.ts"
+      "destination": "/hrms-main/hrms-main/backend-hrms/src/index.ts"
     },
     {
       "source": "/ping",
-      "destination": "hrms-main/hrms-main/backend-hrms/src/index.ts"
+      "destination": "/hrms-main/hrms-main/backend-hrms/src/index.ts"
     },
     {
       "source": "/(static/.*)",
