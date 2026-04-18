@@ -21,8 +21,8 @@ export const generateKPIPDF = async (req: Request, res: Response) => {
     res.json({
       success: true,
       message: 'PDF generated successfully',
-      filePath: path.relative(PDF_STORAGE_DIR, filePath),
-      fileName: path.basename(filePath),
+      filePath,
+      fileName: filePath.split('/').pop(),
     });
   } catch (error: any) {
     console.error('Error generating KPI PDF:', error);
@@ -162,8 +162,8 @@ export const generateAssetPDF = async (req: Request, res: Response) => {
     res.json({
       success: true,
       message: 'PDF generated successfully',
-      filePath: path.relative(PDF_STORAGE_DIR, filePath),
-      fileName: path.basename(filePath),
+      filePath,
+      fileName: filePath.split('/').pop(),
     });
   } catch (error: any) {
     console.error('Error generating Asset PDF:', error);
@@ -227,8 +227,8 @@ export const generateEmployeeFormPDF = async (req: Request, res: Response) => {
     res.json({
       success: true,
       message: 'PDF generated successfully',
-      filePath: path.relative(PDF_STORAGE_DIR, filePath),
-      fileName: path.basename(filePath),
+      filePath,
+      fileName: filePath.split('/').pop(),
     });
   } catch (error: any) {
     console.error('Error generating Employee Form PDF:', error);

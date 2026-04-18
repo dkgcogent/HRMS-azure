@@ -116,7 +116,11 @@ const ProfileUpdateForm: React.FC = () => {
           city: data.city || '',
           state: data.state || '',
           pincode: data.pincode || '',
-          photoPath: data.photoPath ? `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}${data.photoPath}` : undefined,
+          photoPath: data.photoPath 
+            ? (data.photoPath.startsWith('http') 
+              ? data.photoPath 
+              : `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}${data.photoPath}`) 
+            : undefined,
           emergencyContactName: data.emergencyContactName || '',
           emergencyContactNumber: data.emergencyContactNumber || '',
           emergencyContactRelation: data.emergencyContactRelation || '',

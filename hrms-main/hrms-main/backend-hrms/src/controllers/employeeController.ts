@@ -484,29 +484,24 @@ export const uploadEmployeeDocument = async (req: Request, res: Response) => {
   console.log('📤 req.file:', req.file);
 
   const { employeeId, documentTypeId, reference } = req.body;
-  const diskPath = req.file?.path;
+  const buffer = req.file?.buffer;
   const fileName = req.file?.originalname;
 
-  console.log('📤 Extracted values:', { employeeId, documentTypeId, reference, diskPath, fileName });
+  console.log('📤 Extracted values:', { employeeId, documentTypeId, reference, fileName, hasBuffer: !!buffer });
 
-  if (!employeeId || !documentTypeId || !diskPath) {
+  if (!employeeId || !documentTypeId || !buffer || !fileName) {
     console.log('❌ Validation failed - missing required fields');
     return res.status(400).json({ success: false, message: 'Employee ID, Document Type ID, and file are required' });
   }
 
   try {
-    // Convert disk path to web-accessible path
-    // diskPath is like: "D:\HRMS_Uploads\documents\file-123.pdf"
-    // We need: "/uploads/documents/file-123.pdf"
+    const { uploadBufferToBlob, getBlobUrl } = require('../services/azureBlobService');
 
-    const path = require('path');
-    const { UPLOAD_BASE_DIR } = require('../config/uploadConfig');
+    // Upload to Azure blob storage in "documents" folder
+    const blobName = await uploadBufferToBlob(buffer, fileName, 'documents/');
+    const webPath = getBlobUrl(blobName); // Store public URL
 
-    // Use path.relative to get the part after UPLOAD_BASE_DIR
-    const relativePath = path.relative(UPLOAD_BASE_DIR, diskPath); // Gets "documents\file-123.pdf"
-    const webPath = '/uploads/' + relativePath.replace(/\\/g, '/'); // Converts to "/uploads/documents/file-123.pdf"
-
-    console.log('📤 Converted paths:', { diskPath, relativePath, webPath });
+    console.log('📤 File uploaded to Azure Blob:', { blobName, webPath });
     console.log('📤 Inserting into database:', { employeeId, documentTypeId, webPath, fileName, reference });
 
     const [result] = await pool.query(
@@ -677,25 +672,13 @@ export const createEmployeeWithPhoto = async (req: Request, res: Response) => {
     let photoFileName = null;
     if (req.file) {
       try {
-        const fileName = `${Date.now()}-${req.file.originalname}`;
-        const fs = require('fs');
-        const path = require('path');
-
-        // Ensure uploads directory exists on D: drive
-        const uploadsDir = path.join(UPLOAD_BASE_DIR, 'photos');
-        console.log('Uploads directory path:', uploadsDir);
-
-        if (!fs.existsSync(uploadsDir)) {
-          console.log('Creating uploads directory...');
-          fs.mkdirSync(uploadsDir, { recursive: true });
-        }
-
-        // Save file
-        const filePath = path.join(uploadsDir, fileName);
-        console.log('Saving file to:', filePath);
-        fs.writeFileSync(filePath, req.file.buffer);
-        photoFileName = `/uploads/photos/${fileName}`;
-        console.log('Photo saved successfully:', photoFileName);
+        const { uploadBufferToBlob, getBlobUrl } = require('../services/azureBlobService');
+        const fileName = req.file.originalname;
+        
+        console.log('Uploading photo to Azure Blob Storage...');
+        const blobName = await uploadBufferToBlob(req.file.buffer, fileName, 'photos/');
+        photoFileName = getBlobUrl(blobName);
+        console.log('Photo saved successfully to Azure:', photoFileName);
       } catch (photoError: any) {
         console.error('=== PHOTO UPLOAD ERROR ===');
         console.error('Photo upload failed:', photoError);
@@ -851,20 +834,11 @@ export const updateEmployeeWithPhoto = async (req: Request, res: Response) => {
     let photoFileName = photoPath;
     if (req.file) {
       try {
-        const fileName = `${Date.now()}-${req.file.originalname}`;
-        const fs = require('fs');
-        const path = require('path');
+        const { uploadBufferToBlob, getBlobUrl } = require('../services/azureBlobService');
+        const fileName = req.file.originalname;
 
-        // Ensure uploads directory exists on D: drive
-        const uploadsDir = path.join(UPLOAD_BASE_DIR, 'photos');
-        if (!fs.existsSync(uploadsDir)) {
-          fs.mkdirSync(uploadsDir, { recursive: true });
-        }
-
-        // Save file
-        const filePath = path.join(uploadsDir, fileName);
-        fs.writeFileSync(filePath, req.file.buffer);
-        photoFileName = `/uploads/photos/${fileName}`;
+        const blobName = await uploadBufferToBlob(req.file.buffer, fileName, 'photos/');
+        photoFileName = getBlobUrl(blobName);
       } catch (photoError: any) {
         return res.status(500).json({
           success: false,

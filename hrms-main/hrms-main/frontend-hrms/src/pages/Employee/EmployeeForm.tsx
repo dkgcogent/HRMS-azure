@@ -211,8 +211,11 @@ const EmployeeForm: React.FC = () => {
         // Set photo preview if employee has an existing photo
         // Need to prepend the backend URL for the preview to work
         if (employeeData.photoPath && typeof employeeData.photoPath === 'string') {
-          setPhotoPreview(`${API_BASE_URL}${employeeData.photoPath}`);
-          console.log('📸 Photo preview set:', `${API_BASE_URL}${employeeData.photoPath}`);
+          const finalPhotoPath = employeeData.photoPath.startsWith('http') 
+            ? employeeData.photoPath 
+            : `${API_BASE_URL}${employeeData.photoPath}`;
+          setPhotoPreview(finalPhotoPath);
+          console.log('📸 Photo preview set:', finalPhotoPath);
         }
       }
 
@@ -613,12 +616,12 @@ const EmployeeForm: React.FC = () => {
   };
 
   const handleViewDocument = (filePath: string) => {
-    const fileUrl = `${API_BASE_URL}${filePath}`;
+    const fileUrl = filePath.startsWith('http') ? filePath : `${API_BASE_URL}${filePath}`;
     window.open(fileUrl, '_blank');
   };
 
   const handleDownloadDocument = (filePath: string, fileName: string) => {
-    const fileUrl = `${API_BASE_URL}${filePath}`;
+    const fileUrl = filePath.startsWith('http') ? filePath : `${API_BASE_URL}${filePath}`;
     const link = document.createElement('a');
     link.href = fileUrl;
     link.download = fileName;
@@ -941,7 +944,11 @@ const EmployeeForm: React.FC = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 3 }}>
                   <Box sx={{ position: 'relative' }}>
                     <Avatar
-                      src={photoPreview || (typeof employee.photoPath === 'string' && employee.photoPath ? `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}${employee.photoPath}` : undefined)}
+                      src={photoPreview || (typeof employee.photoPath === 'string' && employee.photoPath 
+                        ? (employee.photoPath.startsWith('http') 
+                          ? employee.photoPath 
+                          : `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}${employee.photoPath}`) 
+                        : undefined)}
                       sx={{ width: 120, height: 120, border: '3px solid #e0e0e0' }}
                     >
                       {!photoPreview && !employee.photoPath && (

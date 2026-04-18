@@ -93,8 +93,9 @@ export const generateOfferLetterPDF = async (req: Request, res: Response) => {
             margins: { top: 50, bottom: 50, left: 72, right: 72 }
         });
 
-        const stream = fs.createWriteStream(filePath);
-        doc.pipe(stream);
+        const { uploadBufferToBlob, getBlobUrl } = require('../services/azureBlobService');
+        const buffers: Buffer[] = [];
+        doc.on('data', buffers.push.bind(buffers));
 
         // Helper function to format date
         const formatDate = (dateStr: string): string => {
@@ -386,15 +387,8 @@ export const generateOfferLetterPDF = async (req: Request, res: Response) => {
                 const base64Data = formData.candidateSignature.replace(/^data:image\/\w+;base64,/, '');
                 const imageBuffer = Buffer.from(base64Data, 'base64');
 
-                // Save temp image file
-                const tempImagePath = path.join(PDF_STORAGE_DIR, `temp_sig_${Date.now()}.png`);
-                fs.writeFileSync(tempImagePath, imageBuffer);
-
-                // Add image to PDF
-                doc.image(tempImagePath, 150, page3Y + 345, { width: 100, height: 40 });
-
-                // Delete temp file
-                fs.unlinkSync(tempImagePath);
+                // Add image to PDF directly from buffer
+                doc.image(imageBuffer, 150, page3Y + 345, { width: 100, height: 40 });
             } catch (err: any) {
                 console.error('Error adding signature image:', err.message);
             }
@@ -515,8 +509,12 @@ export const generateOfferLetterPDF = async (req: Request, res: Response) => {
 
         doc.end();
 
-        stream.on('finish', async () => {
+        doc.on('end', async () => {
             try {
+                const pdfData = Buffer.concat(buffers);
+                const blobName = await uploadBufferToBlob(pdfData, fileName, 'pdfs/', 'application/pdf');
+                const webPath = getBlobUrl(blobName);
+
                 // Insert into database BEFORE sending the PDF
                 const [result] = await pool.query<ResultSetHeader>(
                     `INSERT INTO hrms_offer_letters 
@@ -531,7 +529,7 @@ export const generateOfferLetterPDF = async (req: Request, res: Response) => {
                         formData.monthlyCTC,
                         formData.yearlyCTC,
                         JSON.stringify(formData),
-                        filePath.replace(/\\/g, '/') // Ensure forward slashes for cross-platform compatibility
+                        webPath
                     ]
                 );
 
@@ -540,16 +538,12 @@ export const generateOfferLetterPDF = async (req: Request, res: Response) => {
                 // Set headers for PDF download
                 res.setHeader('Content-Type', 'application/pdf');
                 res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-                res.setHeader('Content-Length', fs.statSync(filePath).size);
+                res.setHeader('Content-Length', pdfData.length);
                 res.setHeader('X-Offer-Letter-Id', result.insertId.toString());
                 res.setHeader('Access-Control-Expose-Headers', 'X-Offer-Letter-Id');
 
-                // Stream the file
-                const fileStream = fs.createReadStream(filePath);
-                fileStream.pipe(res);
-
-                // Note: We keep the PDF file since we store its path in the database
-                // If you want to delete it later, implement a cleanup job
+                // Stream the file directly from memory
+                res.send(pdfData);
             } catch (dbError: any) {
                 console.error('Error saving offer letter to database:', dbError);
                 res.status(500).json({
@@ -560,7 +554,7 @@ export const generateOfferLetterPDF = async (req: Request, res: Response) => {
             }
         });
 
-        stream.on('error', (error) => {
+        doc.on('error', (error) => {
             console.error('Error generating offer letter PDF:', error);
             res.status(500).json({
                 success: false,

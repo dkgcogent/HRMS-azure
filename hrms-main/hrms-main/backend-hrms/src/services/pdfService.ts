@@ -279,8 +279,9 @@ class PDFService {
             ...options,
           });
 
-          const stream = fs.createWriteStream(filePath);
-          doc.pipe(stream);
+          const { uploadBufferToBlob, getBlobUrl } = require('./azureBlobService');
+          const buffers: Buffer[] = [];
+          doc.on('data', buffers.push.bind(buffers));
 
           let yPosition = 100;
 
@@ -452,23 +453,17 @@ class PDFService {
 
           doc.end();
 
-          stream.on('finish', () => {
-            clearTimeout(timeout);
-            console.log(`[PDF Service] KPI PDF file written successfully: ${filePath}`);
-            // Verify file was created
-            if (fs.existsSync(filePath)) {
-              const stats = fs.statSync(filePath);
-              console.log(`[PDF Service] PDF file size: ${stats.size} bytes`);
-              resolve(filePath);
-            } else {
-              reject(new Error(`PDF file was not created at: ${filePath}`));
+          doc.on('end', async () => {
+            try {
+              clearTimeout(timeout);
+              const pdfData = Buffer.concat(buffers);
+              const blobName = await uploadBufferToBlob(pdfData, fileName, 'pdfs/', 'application/pdf');
+              const blobUrl = getBlobUrl(blobName);
+              console.log('[PDF Service] PDF generated and uploaded to Azure:', blobUrl);
+              resolve(blobUrl);
+            } catch (err) {
+              reject(err);
             }
-          });
-
-          stream.on('error', (error) => {
-            clearTimeout(timeout);
-            console.error(`[PDF Service] Stream error while writing KPI PDF:`, error);
-            reject(error);
           });
 
           doc.on('error', (error) => {
@@ -506,8 +501,9 @@ class PDFService {
           ...options,
         });
 
-        const stream = fs.createWriteStream(filePath);
-        doc.pipe(stream);
+        const { uploadBufferToBlob, getBlobUrl } = require('./azureBlobService');
+        const buffers: Buffer[] = [];
+        doc.on('data', buffers.push.bind(buffers));
 
         let yPosition = 100;
 
@@ -710,12 +706,15 @@ class PDFService {
 
         doc.end();
 
-        stream.on('finish', () => {
-          resolve(filePath);
-        });
-
-        stream.on('error', (error) => {
-          reject(error);
+        doc.on('end', async () => {
+          try {
+            const pdfData = Buffer.concat(buffers);
+            const blobName = await uploadBufferToBlob(pdfData, fileName, 'pdfs/', 'application/pdf');
+            const blobUrl = getBlobUrl(blobName);
+            resolve(blobUrl);
+          } catch(err) {
+            reject(err);
+          }
         });
       } catch (error) {
         reject(error);
@@ -743,8 +742,9 @@ class PDFService {
           ...options,
         });
 
-        const stream = fs.createWriteStream(filePath);
-        doc.pipe(stream);
+        const { uploadBufferToBlob, getBlobUrl } = require('./azureBlobService');
+        const buffers: Buffer[] = [];
+        doc.on('data', buffers.push.bind(buffers));
 
         let yPosition = 100;
 
@@ -807,12 +807,15 @@ class PDFService {
 
         doc.end();
 
-        stream.on('finish', () => {
-          resolve(filePath);
-        });
-
-        stream.on('error', (error) => {
-          reject(error);
+        doc.on('end', async () => {
+          try {
+            const pdfData = Buffer.concat(buffers);
+            const blobName = await uploadBufferToBlob(pdfData, fileName, 'pdfs/', 'application/pdf');
+            const blobUrl = getBlobUrl(blobName);
+            resolve(blobUrl);
+          } catch(err) {
+            reject(err);
+          }
         });
       } catch (error) {
         reject(error);

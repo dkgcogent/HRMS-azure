@@ -9,15 +9,7 @@ const router = express.Router();
 import { UPLOAD_BASE_DIR } from '../config/uploadConfig';
 
 // Multer storage configuration for documents
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(UPLOAD_BASE_DIR, 'documents'));
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
+const storage = multer.memoryStorage();
 
 // Multer storage configuration for photos
 const photoStorage = multer.memoryStorage();
