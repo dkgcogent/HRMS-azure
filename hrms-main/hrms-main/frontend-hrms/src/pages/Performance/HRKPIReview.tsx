@@ -33,6 +33,7 @@ import {
   Assessment as AssessmentIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_BASE_URL } from '../../services/api';
 
 interface KPIItem {
   id: number;
@@ -82,7 +83,7 @@ const HRKPIReview: React.FC = () => {
   const loadKPIs = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/kpi/hr/review`, {
+      const response = await fetch(`${API_BASE_URL}/api/kpi/hr/review`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
         },
@@ -145,7 +146,7 @@ const HRKPIReview: React.FC = () => {
       }));
 
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/kpi/${selectedKPI.id}/manager-review`,
+        `${API_BASE_URL}/api/kpi/${selectedKPI.id}/manager-review`,
         {
           method: 'POST',
           headers: {

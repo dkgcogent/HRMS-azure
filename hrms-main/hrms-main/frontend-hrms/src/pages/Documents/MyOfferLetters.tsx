@@ -19,6 +19,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
+import { API_BASE_URL, getPublicUrl } from '../../services/api';
 
 interface OfferLetter {
     id: number;
@@ -38,8 +39,7 @@ const MyOfferLetters: React.FC = () => {
         if (!user?.employeeId) return;
         try {
             setLoading(true);
-            const apiUrl = process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}`;
-            const response = await axios.get(`${apiUrl}/api/offer-letters/my-letters/${user.employeeId}`);
+            const response = await axios.get(`${API_BASE_URL}/api/offer-letters/my-letters/${user.employeeId}`);
             if (response.data.success) {
                 setOfferLetters(response.data.data);
             }
@@ -55,16 +55,15 @@ const MyOfferLetters: React.FC = () => {
     }, [user?.employeeId]);
 
     const handleView = async (letter: OfferLetter) => {
-        const apiUrl = process.env.REACT_APP_API_URL || `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}`;
         const filename = letter.pdf_path.split(/[/\\]/).pop();
         if (filename) {
-            const pdfUrl = `${apiUrl}/uploads/pdfs/${filename}`;
+            const pdfUrl = getPublicUrl(`/uploads/pdfs/${filename}`);
             window.open(pdfUrl, '_blank');
 
             // Update status to Viewed if it's currently Sent
             if (letter.status === 'Sent') {
                 try {
-                    await axios.put(`${apiUrl}/api/offer-letters/${letter.id}/status`, {
+                    await axios.put(`${API_BASE_URL}/api/offer-letters/${letter.id}/status`, {
                         status: 'Viewed'
                     });
                     // Optimized: update local state instead of full refetch if possible

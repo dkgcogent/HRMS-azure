@@ -10,6 +10,20 @@ export const API_BASE_URL = rawApiUrl === '/' ? '' : (rawApiUrl ? rawApiUrl.repl
 // Static images need the '/api' prefix to correctly trigger the Vercel backend rewrite.
 export const IMAGE_BASE_URL = rawApiUrl === '/' ? '/api' : (rawApiUrl ? rawApiUrl.replace(/\/$/, '') : 'http://localhost:3004');
 
+/**
+ * Robustly joins a base URL with a path, ensuring a single slash and 
+ * preserving absolute URLs.
+ */
+export const getPublicUrl = (path: string | null | undefined): string => {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  
+  const cleanBase = IMAGE_BASE_URL.replace(/\/$/, '');
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  
+  return `${cleanBase}${cleanPath}`;
+};
+
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,

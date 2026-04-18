@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../../services/api';
 import {
   Box,
   Paper,
@@ -55,7 +56,7 @@ const AssetHistory: React.FC<AssetHistoryProps> = ({ assetId }) => {
   const loadHistory = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/assets/${assetId}/history`, {
+      const response = await fetch(`${API_BASE_URL}/api/assets/${assetId}/history`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
         },

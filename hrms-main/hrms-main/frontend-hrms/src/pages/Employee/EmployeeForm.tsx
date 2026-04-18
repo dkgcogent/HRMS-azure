@@ -43,7 +43,7 @@ import {
   Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Employee, apiService, API_BASE_URL, IMAGE_BASE_URL } from '../../services/api';
+import { Employee, apiService, API_BASE_URL, IMAGE_BASE_URL, getPublicUrl } from '../../services/api';
 
 // Create a Grid component that always includes component="div" for Grid items
 const Grid = (props: GridProps & {
@@ -211,9 +211,7 @@ const EmployeeForm: React.FC = () => {
         // Set photo preview if employee has an existing photo
         // Need to prepend the backend URL for the preview to work
         if (employeeData.photoPath && typeof employeeData.photoPath === 'string') {
-          const finalPhotoPath = employeeData.photoPath.startsWith('http') 
-            ? employeeData.photoPath 
-            : `${IMAGE_BASE_URL}${employeeData.photoPath.startsWith('/') ? '' : '/'}${employeeData.photoPath}`;
+          const finalPhotoPath = getPublicUrl(employeeData.photoPath);
           setPhotoPreview(finalPhotoPath);
           console.log('📸 Photo preview set:', finalPhotoPath);
         }
@@ -616,12 +614,12 @@ const EmployeeForm: React.FC = () => {
   };
 
   const handleViewDocument = (filePath: string) => {
-    const fileUrl = filePath.startsWith('http') ? filePath : `${API_BASE_URL}${filePath.startsWith('/') ? '' : '/'}${filePath}`;
+    const fileUrl = getPublicUrl(filePath);
     window.open(fileUrl, '_blank');
   };
 
   const handleDownloadDocument = (filePath: string, fileName: string) => {
-    const fileUrl = filePath.startsWith('http') ? filePath : `${IMAGE_BASE_URL}${filePath.startsWith('/') ? '' : '/'}${filePath}`;
+    const fileUrl = getPublicUrl(filePath);
     const link = document.createElement('a');
     link.href = fileUrl;
     link.download = fileName;
@@ -945,9 +943,7 @@ const EmployeeForm: React.FC = () => {
                   <Box sx={{ position: 'relative' }}>
                     <Avatar
                       src={photoPreview || (typeof employee.photoPath === 'string' && employee.photoPath 
-                        ? (employee.photoPath.startsWith('http') 
-                          ? employee.photoPath 
-                          : `${IMAGE_BASE_URL}${employee.photoPath.startsWith('/') ? '' : '/'}${employee.photoPath}`) 
+                        ? getPublicUrl(employee.photoPath)
                         : undefined)}
                       sx={{ width: 120, height: 120, border: '3px solid #e0e0e0' }}
                     >

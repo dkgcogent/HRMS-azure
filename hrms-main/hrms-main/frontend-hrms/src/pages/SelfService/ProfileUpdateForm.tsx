@@ -24,7 +24,7 @@ import {
   Edit as EditIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { apiService } from '../../services/api';
+import { apiService, getPublicUrl } from '../../services/api';
 
 interface EmployeeProfile {
   id: number;
@@ -117,9 +117,7 @@ const ProfileUpdateForm: React.FC = () => {
           state: data.state || '',
           pincode: data.pincode || '',
           photoPath: data.photoPath 
-            ? (data.photoPath.startsWith('http') 
-              ? data.photoPath 
-              : `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}${data.photoPath}`) 
+            ? getPublicUrl(data.photoPath)
             : undefined,
           emergencyContactName: data.emergencyContactName || '',
           emergencyContactNumber: data.emergencyContactNumber || '',

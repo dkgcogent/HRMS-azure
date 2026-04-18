@@ -42,6 +42,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import CSVExportButton from '../../components/CSVExportButton';
+import { API_BASE_URL, getPublicUrl } from '../../services/api';
 
 
 interface Asset {
@@ -89,7 +90,7 @@ const AssetList: React.FC = () => {
       if (statusFilter) params.append('status', statusFilter);
       if (searchTerm) params.append('search', searchTerm);
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/assets?${params.toString()}`, {
+      const response = await fetch(`${API_BASE_URL}/api/assets?${params.toString()}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
         },
@@ -173,7 +174,7 @@ const AssetList: React.FC = () => {
     if (!selectedAsset) return;
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/assets/${selectedAsset.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/assets/${selectedAsset.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
@@ -529,7 +530,7 @@ const AssetList: React.FC = () => {
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       {asset.primary_photo ? (
-                        <Avatar src={`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}${asset.primary_photo}`} variant="rounded" />
+                        <Avatar src={getPublicUrl(asset.primary_photo)} variant="rounded" />
                       ) : (
                         <Avatar variant="rounded">{getCategoryIcon(asset.category)}</Avatar>
                       )}

@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../../services/api';
 import {
   Box,
   Paper,
@@ -51,7 +52,7 @@ const KPIList: React.FC = () => {
   const loadKPIs = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}/api/kpi`, {
+      const response = await fetch(`${API_BASE_URL}/api/kpi`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
         },

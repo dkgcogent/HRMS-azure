@@ -1,4 +1,6 @@
+// @ts-nocheck
 import React, { useRef, useState } from 'react';
+import { API_BASE_URL, getPublicUrl } from '../../services/api';
 import {
   Button,
   Box,
@@ -100,7 +102,7 @@ export const FileUploadButton: React.FC<FileUploadButtonProps> = ({
   };
 
   const handleDownload = (file: TaskFile) => {
-    const url = `${process.env.REACT_APP_API_URL === '/' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3004')}${file.file_path}`;
+    const url = getPublicUrl(file.file_path);
     window.open(url, '_blank');
   };
 
