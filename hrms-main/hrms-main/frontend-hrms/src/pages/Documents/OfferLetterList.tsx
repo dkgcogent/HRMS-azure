@@ -38,7 +38,6 @@ import {
     DialogTitle,
     DialogContent,
     DialogContentText,
-    DialogContentText,
     DialogActions,
 } from '@mui/material';
 import { API_BASE_URL, getPublicUrl } from '../../services/api';
