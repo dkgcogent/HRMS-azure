@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 
-const UPLOAD_BASE_DIR = process.env.UPLOAD_BASE_DIR || 'D:/HRMS_Uploads';
+import { UPLOAD_BASE_DIR } from '../config/uploadConfig';
 const tasksDir = path.join(UPLOAD_BASE_DIR, 'tasks');
 
 // Ensure uploads directory exists

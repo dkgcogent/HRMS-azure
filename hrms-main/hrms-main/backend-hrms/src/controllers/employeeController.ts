@@ -3,7 +3,7 @@ import { Request, Response } from 'express';
 import pool from '../db';
 
 // Define upload base directory on D: drive
-const UPLOAD_BASE_DIR = 'D:/HRMS_Uploads';
+import { UPLOAD_BASE_DIR } from '../config/uploadConfig';
 
 // Utility function to convert ISO date string to MySQL date format (YYYY-MM-DD)
 const formatDateForMySQL = (dateString: string | null | undefined): string | null => {

@@ -1,3 +1,10 @@
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException] Fatal error:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[unhandledRejection] Unhandled promise rejection:', reason);
+});
+
 import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
@@ -290,6 +297,19 @@ app.use((req, res) => {
     });
   } else {
     res.status(404).json({ success: false, message: 'Route not found' });
+  }
+});
+
+// Global Error Handler to prevent app crashes on unhandled errors in routes
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error(`[Global Error Handler] Error during ${req.method} ${req.url}:`, err);
+  if (!res.headersSent) {
+    res.status(500).json({
+      success: false,
+      message: 'Internal Server Error',
+      error: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 });
 

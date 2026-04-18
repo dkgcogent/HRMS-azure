@@ -6,8 +6,7 @@ import { getAllEmployees, getEmployeeById, createEmployee, updateEmployee, delet
 
 const router = express.Router();
 
-// Define upload base directory on D: drive
-const UPLOAD_BASE_DIR = 'D:/HRMS_Uploads';
+import { UPLOAD_BASE_DIR } from '../config/uploadConfig';
 
 // Multer storage configuration for documents
 const storage = multer.diskStorage({
