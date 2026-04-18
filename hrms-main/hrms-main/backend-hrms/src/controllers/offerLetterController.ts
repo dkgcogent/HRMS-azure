@@ -1,10 +1,9 @@
 import { Request, Response } from 'express';
 import PDFDocument from 'pdfkit';
-import fs from 'fs';
 import path from 'path';
 import { PDF_STORAGE_DIR, ASSETS_DIR } from '../config/uploadConfig';
 import pool from '../db';
-import { uploadBufferToBlob, getBlobUrl, getBlobBuffer } from '../services/azureBlobService';
+import { uploadBufferToBlob, getBlobUrl, getBlobBuffer, deleteBlob } from '../services/azureBlobService';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 interface OfferLetterData {
@@ -80,13 +79,7 @@ export const generateOfferLetterPDF = async (req: Request, res: Response) => {
             });
         }
 
-        // Ensure PDF directory exists
-        if (!fs.existsSync(PDF_STORAGE_DIR)) {
-            fs.mkdirSync(PDF_STORAGE_DIR, { recursive: true });
-        }
-
         const fileName = `Offer_Letter_${formData.candidateName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-        const filePath = path.join(PDF_STORAGE_DIR, fileName);
 
         // Create PDF document
         const doc = new PDFDocument({
@@ -694,8 +687,19 @@ export const deleteOfferLetter = async (req: Request, res: Response) => {
 
         if (rows.length > 0) {
             const filePath = rows[0].pdf_path;
-            if (filePath && fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
+            if (filePath && filePath.includes('blob.core.windows.net')) {
+                try {
+                    // Extract blob name from Azure URL
+                    const urlParts = filePath.split('/');
+                    const tmsfilesIndex = urlParts.indexOf('tmsfiles');
+                    const blobName = urlParts.slice(tmsfilesIndex + 1).join('/');
+                    if (blobName) {
+                        await deleteBlob(blobName);
+                        console.log(`[Delete Offer Letter] Deleted blob from Azure: ${blobName}`);
+                    }
+                } catch (deleteError) {
+                    console.warn('Failed to delete offer letter from Azure Storage:', deleteError);
+                }
             }
         }
 

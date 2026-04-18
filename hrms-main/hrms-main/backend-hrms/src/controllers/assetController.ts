@@ -13,6 +13,7 @@ import {
   Asset,
 } from '../services/assetService';
 import path from 'path';
+import { uploadBufferToBlob, getBlobUrl, deleteBlob } from '../services/azureBlobService';
 
 // Get all assets with filters
 export const getAllAssets = async (req: Request, res: Response) => {
@@ -703,10 +704,20 @@ export const uploadPhotos = async (req: Request, res: Response) => {
       const file = files[i];
       console.log(`[Upload Photos] Processing file ${i + 1}/${files.length}: ${file.originalname}, size: ${file.size}, type: ${file.mimetype}`);
       
-      const photoPath = `/uploads/assets/${file.filename}`;
-      const isPrimary = i === 0 && !asset.photos?.length; // First photo is primary if no photos exist
-
       try {
+        // Upload to Azure instead of using local path
+        const folderPrefix = 'assets/photos';
+        const blobName = await uploadBufferToBlob(
+          file.buffer,
+          file.originalname,
+          folderPrefix,
+          file.mimetype
+        );
+
+        // Get the public URL for the blob
+        const photoPath = getBlobUrl(blobName);
+        const isPrimary = i === 0 && !asset.photos?.length; // First photo is primary if no photos exist
+
         const photoId = await addAssetPhoto(
           parseInt(assetId),
           {
@@ -719,11 +730,11 @@ export const uploadPhotos = async (req: Request, res: Response) => {
           user.id
         );
 
-        console.log(`[Upload Photos] Photo saved with ID: ${photoId}, path: ${photoPath}`);
+        console.log(`[Upload Photos] Photo saved to Azure with ID: ${photoId}, URL: ${photoPath}`);
         uploadedPhotos.push({ id: photoId, path: photoPath });
       } catch (photoError: any) {
-        console.error(`[Upload Photos] Error saving photo ${file.originalname}:`, photoError);
-        throw new Error(`Failed to save photo ${file.originalname}: ${photoError.message}`);
+        console.error(`[Upload Photos] Error uploading/saving photo ${file.originalname}:`, photoError);
+        throw new Error(`Failed to upload/save photo ${file.originalname}: ${photoError.message}`);
       }
     }
 
@@ -782,6 +793,23 @@ export const deletePhoto = async (req: Request, res: Response) => {
     }
 
     const photo = photoRows[0];
+    
+    // Delete from Azure Blob Storage if it's an Azure URL
+    if (photo.photo_path && photo.photo_path.includes('blob.core.windows.net')) {
+      try {
+        // Extract blob name from URL
+        const urlParts = photo.photo_path.split('/');
+        const tmsfilesIndex = urlParts.indexOf('tmsfiles');
+        const blobName = urlParts.slice(tmsfilesIndex + 1).join('/');
+        
+        if (blobName) {
+          await deleteBlob(blobName);
+          console.log(`[Delete Photo] Deleted blob from Azure: ${blobName}`);
+        }
+      } catch (deleteError) {
+        console.warn(`[Delete Photo] Failed to delete blob from Azure:`, deleteError);
+      }
+    }
 
     // Delete photo from database
     await pool.query('DELETE FROM hrms_asset_photos WHERE id = ? AND asset_id = ?', [photoId, assetId]);

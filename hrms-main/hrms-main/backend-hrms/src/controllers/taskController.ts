@@ -19,6 +19,7 @@ import {
 } from '../services/taskService';
 import path from 'path';
 import { UPLOAD_BASE_DIR } from '../config/uploadConfig';
+import { uploadBufferToBlob, getBlobUrl } from '../services/azureBlobService';
 
 /**
  * Create a new task (HR/Admin only)
@@ -321,9 +322,21 @@ export const uploadFile = async (req: Request, res: Response) => {
       });
     }
 
+    // Upload to Azure instead of using local path
+    const folderPrefix = 'tasks/attachments';
+    const blobName = await uploadBufferToBlob(
+      file.buffer,
+      file.originalname,
+      folderPrefix,
+      file.mimetype
+    );
+
+    // Get the public URL for the blob
+    const fileUrl = getBlobUrl(blobName);
+
     const fileData = {
       fileName: file.originalname,
-      filePath: `/uploads/tasks/${file.filename}`,
+      filePath: fileUrl,
       fileSize: file.size,
       fileType: file.mimetype,
     };
