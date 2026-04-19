@@ -105,7 +105,7 @@ export const generateOfferLetterPDF = async (req: Request, res: Response) => {
 
         // Company Logo and Header
         try {
-            const headerBuffer = await getBlobBuffer('assets/offer_header.png');
+            const headerBuffer = await getBlobBuffer('assets/offer_header.jpeg');
             // Center the header image
             doc.image(headerBuffer, 50, 40, { width: 495 });
             doc.y = 120;
@@ -349,7 +349,7 @@ export const generateOfferLetterPDF = async (req: Request, res: Response) => {
 
         // Authorised Signatory Signature
         try {
-            const signatoryBuffer = await getBlobBuffer('assets/authorised_signatory.png');
+            const signatoryBuffer = await getBlobBuffer('assets/authorised_signatory.jpeg');
             // Place signature image above the text
             doc.image(signatoryBuffer, 72, page3Y + 215, { width: 120, height: 40 });
             doc.fontSize(10)

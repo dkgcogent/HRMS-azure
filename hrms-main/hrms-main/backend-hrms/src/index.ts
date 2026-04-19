@@ -41,6 +41,7 @@ import awardRoutes from './routes/awardRoutes';
 import complianceRoutes from './routes/complianceRoutes';
 import cardRoutes from './routes/cardRoutes';
 import { UPLOAD_BASE_DIR, PHOTOS_DIR, DOCUMENTS_DIR, PDF_STORAGE_DIR, ASSETS_DIR } from './config/uploadConfig';
+import { getBlobBuffer } from './services/azureBlobService';
 
 const app = express();
 const port = process.env.PORT || 8080;
@@ -131,11 +132,11 @@ app.use('/uploads', express.static(UPLOAD_BASE_DIR, {
 }));
 
 // Fallback route for asset photos (in case static middleware has issues)
-app.get('/uploads/assets/:filename', (req, res) => {
+app.get('/uploads/assets/:filename', async (req, res) => {
   const filename = req.params.filename;
   const filePath = path.join(ASSETS_DIR, filename);
 
-  console.log(`[Asset Photo Request] Filename: ${filename}, Path: ${filePath}, Exists: ${fs.existsSync(filePath)}`);
+  console.log(`[Asset Photo Request] Filename: ${filename}`);
 
   // Security: prevent directory traversal
   if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
@@ -143,13 +144,33 @@ app.get('/uploads/assets/:filename', (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid filename' });
   }
 
-  // Check if file exists
+  // Check if file exists locally
   if (!fs.existsSync(filePath)) {
-    console.error(`[Asset Photo Request] File not found: ${filePath}`);
-    return res.status(404).json({ success: false, message: 'File not found', path: filePath });
+    console.log(`[Asset Photo Request] File not found locally: ${filePath}. Trying Azure Storage...`);
+    
+    try {
+      // Fetch from Azure Blob Storage
+      const buffer = await getBlobBuffer(`assets/${filename}`);
+      
+      // Determine content type
+      const ext = path.extname(filename).toLowerCase();
+      let contentType = 'application/octet-stream';
+      if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+      else if (ext === '.png') contentType = 'image/png';
+      else if (ext === '.gif') contentType = 'image/gif';
+      else if (ext === '.webp') contentType = 'image/webp';
+
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=31536000');
+      console.log(`[Asset Photo Request] Serving file from Azure: assets/${filename} with content-type: ${contentType}`);
+      return res.send(buffer);
+    } catch (azureError) {
+      console.warn(`[Asset Photo Request] File not found in Azure either: assets/${filename}`);
+      return res.status(404).json({ success: false, message: 'File not found', path: filePath });
+    }
   }
 
-  // Determine content type
+  // Determine content type for local file
   const ext = path.extname(filename).toLowerCase();
   let contentType = 'application/octet-stream';
   if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
@@ -159,7 +180,7 @@ app.get('/uploads/assets/:filename', (req, res) => {
 
   res.setHeader('Content-Type', contentType);
   res.setHeader('Cache-Control', 'public, max-age=31536000');
-  console.log(`[Asset Photo Request] Serving file: ${filePath} with content-type: ${contentType}`);
+  console.log(`[Asset Photo Request] Serving local file: ${filePath} with content-type: ${contentType}`);
   res.sendFile(filePath);
 });
 

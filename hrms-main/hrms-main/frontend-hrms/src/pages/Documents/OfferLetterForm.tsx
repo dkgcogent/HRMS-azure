@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
     Box,
     Paper,
@@ -704,7 +704,7 @@ const OfferLetterForm: React.FC = () => {
                                     <Box component="span" sx={{ fontSize: '0.75rem', fontWeight: 'normal', px: 1, py: 0.25, bgcolor: 'primary.main', color: 'white', borderRadius: 4 }}>Fixed</Box>
                                 </Typography>
                                 <img
-                                    src={`${IMAGE_BASE_URL}/uploads/assets/authorised_signatory.png`}
+                                    src={`${IMAGE_BASE_URL}/uploads/assets/authorised_signatory.jpeg`}
                                     alt="Authorised Signatory"
                                     style={{ maxWidth: '150px', maxHeight: '60px', display: 'block', marginTop: '8px' }}
                                     onError={(e) => {
@@ -786,7 +786,7 @@ const OfferLetterForm: React.FC = () => {
                 {/* Header Image Preview */}
                 <Box sx={{ mb: 4, display: 'flex', justifyContent: 'center', borderBottom: '1px solid #eee', pb: 2 }}>
                     <img
-                        src={`${IMAGE_BASE_URL}/uploads/assets/offer_header.png`}
+                        src={`${IMAGE_BASE_URL}/uploads/assets/offer_header.jpeg`}
                         alt="Offer Letter Header"
                         style={{ maxWidth: '100%', height: 'auto', maxHeight: '120px' }}
                         onError={(e) => {

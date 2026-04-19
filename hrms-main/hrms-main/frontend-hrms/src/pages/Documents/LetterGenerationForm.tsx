@@ -10,8 +10,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Card,
-  CardContent,
   TextField,
   Alert,
   Snackbar,
@@ -29,7 +27,7 @@ import {
   Send as SendIcon,
   Save as SaveIcon,
 } from '@mui/icons-material';
-import { apiService, IMAGE_BASE_URL } from '../../services/api';
+import { IMAGE_BASE_URL } from '../../services/api';
 
 interface LetterTemplate {
   id: number;
@@ -568,7 +566,7 @@ Best regards,
             {(selectedTemplate?.type === 'OFFER' || selectedTemplate?.name.toLowerCase().includes('offer')) && (
               <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center', borderBottom: '1px solid #eee', pb: 2 }}>
                 <img
-                  src={`${IMAGE_BASE_URL}/uploads/assets/offer_header.png`}
+                  src={`${IMAGE_BASE_URL}/uploads/assets/offer_header.jpeg`}
                   alt="Letter Header"
                   style={{ maxWidth: '100%', height: 'auto', maxHeight: '100px' }}
                   onError={(e) => {
