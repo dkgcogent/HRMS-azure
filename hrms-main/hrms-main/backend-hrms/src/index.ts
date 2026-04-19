@@ -114,7 +114,7 @@ app.use((req, res, next) => {
 // Serve static files from uploads directory on D: drive
 // This serves files from UPLOAD_BASE_DIR at /uploads route
 // So /uploads/assets/filename.jpg maps to D:/HRMS_Uploads/assets/filename.jpg
-app.use('/uploads', express.static(UPLOAD_BASE_DIR, {
+const staticUploads = express.static(UPLOAD_BASE_DIR, {
   setHeaders: (res, filePath) => {
     // Set proper headers for image files
     const ext = path.extname(filePath).toLowerCase();
@@ -129,10 +129,13 @@ app.use('/uploads', express.static(UPLOAD_BASE_DIR, {
     }
     res.setHeader('Cache-Control', 'public, max-age=31536000');
   }
-}));
+});
+
+app.use('/uploads', staticUploads);
+app.use('/api/uploads', staticUploads);
 
 // Fallback route for asset photos (in case static middleware has issues)
-app.get('/uploads/assets/:filename', async (req, res) => {
+const assetsHandler = async (req: express.Request, res: express.Response) => {
   const filename = req.params.filename;
   const filePath = path.join(ASSETS_DIR, filename);
 
@@ -182,7 +185,10 @@ app.get('/uploads/assets/:filename', async (req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=31536000');
   console.log(`[Asset Photo Request] Serving local file: ${filePath} with content-type: ${contentType}`);
   res.sendFile(filePath);
-});
+};
+
+app.get('/uploads/assets/:filename', assetsHandler);
+app.get('/api/uploads/assets/:filename', assetsHandler);
 
 app.get('/', (req, res) => {
   res.send('HRMS Backend is running!');
