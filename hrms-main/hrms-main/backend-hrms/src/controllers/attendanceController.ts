@@ -1035,9 +1035,9 @@ async function ensureEmployeeForUser(user: AuthUser): Promise<number> {
     const [result]: any = await pool.query(
       `INSERT INTO hrms_employees
        (employee_id, first_name, middle_name, last_name, gender, date_of_birth, mobile, email, address, city, state, pincode,
-        manpower_type_id, department_id, designation_id, work_location_id, shift_id, joining_date, status, bank_id, account_number, payment_mode_id, is_active)
+        manpower_type_id, department_id, designation_id, work_location_id, shift_id, joining_date, status, bank_id, account_number, account_holder_name, ifsc_code, branch_name, payment_mode_id, is_active)
        VALUES (?, ?, NULL, ?, 'OTHER', '1990-01-01', '0000000000', ?, NULL, 'N/A', 'N/A', '000000',
-        ?, ?, ?, ?, NULL, CURDATE(), 'ACTIVE', NULL, NULL, NULL, 1)`,
+        ?, ?, ?, ?, NULL, CURDATE(), 'ACTIVE', NULL, NULL, NULL, NULL, NULL, NULL, 1)`,
       [
         employeeCode,
         firstName,

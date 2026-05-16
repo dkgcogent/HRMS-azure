@@ -206,7 +206,8 @@ export const createEmployee = async (req: Request, res: Response) => {
   console.log('Request Body:', JSON.stringify(req.body, null, 2));
   console.log('Request Headers:', JSON.stringify(req.headers, null, 2));
   let {
-    employeeId, firstName, middleName, lastName, gender, dateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoPath, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, joiningDate, status = 'ACTIVE', bankId, accountNumber, paymentModeId, customerId, projectId,
+    employeeId, firstName, middleName, lastName, gender, dateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoPath, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, joiningDate, status = 'ACTIVE', 
+    bankId, accountNumber, accountHolderName, ifscCode, branchName, paymentModeId, customerId, projectId,
     emergencyContactName, emergencyContactNumber, emergencyContactRelation, personalEmail, alternateNumber, maritalStatus, bloodGroup, qualificationIds
   } = req.body;
 
@@ -296,13 +297,14 @@ export const createEmployee = async (req: Request, res: Response) => {
 
     console.log('=== DATABASE INSERTION START ===');
     const insertData = [
-      employeeId, firstName, middleName, lastName, gender, formattedDateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoPath, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, formattedJoiningDate, status, bankId, accountNumber, paymentModeId, customerId || null, projectId || null,
+      employeeId, firstName, middleName, lastName, gender, formattedDateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoPath, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, formattedJoiningDate, status, 
+      bankId, accountNumber, accountHolderName || null, ifscCode || null, branchName || null, paymentModeId, customerId || null, projectId || null,
       emergencyContactName || null, emergencyContactNumber || null, emergencyContactRelation || null, personalEmail || null, alternateNumber || null, maritalStatus || 'SINGLE', bloodGroup || null
     ];
     console.log('Insert parameters:', insertData);
 
     const [result]: any = await pool.query(
-      'INSERT INTO hrms_employees (employee_id, first_name, middle_name, last_name, gender, date_of_birth, mobile, email, work_email, address, city, state, pincode, photo_path, manpower_type_id, department_id, designation_id, work_location_id, shift_id, joining_date, status, bank_id, account_number, payment_mode_id, customer_id, project_id, emergency_contact_name, emergency_contact_number, emergency_contact_relation, personal_email, alternate_number, marital_status, blood_group) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO hrms_employees (employee_id, first_name, middle_name, last_name, gender, date_of_birth, mobile, email, work_email, address, city, state, pincode, photo_path, manpower_type_id, department_id, designation_id, work_location_id, shift_id, joining_date, status, bank_id, account_number, account_holder_name, ifsc_code, branch_name, payment_mode_id, customer_id, project_id, emergency_contact_name, emergency_contact_number, emergency_contact_relation, personal_email, alternate_number, marital_status, blood_group) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       insertData
     );
     console.log('Insert result:', result);
@@ -345,7 +347,7 @@ export const createEmployee = async (req: Request, res: Response) => {
 export const updateEmployee = async (req: Request, res: Response) => {
   const { id } = req.params;
   const {
-    employeeId, firstName, middleName, lastName, gender, dateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoPath, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, joiningDate, status = 'ACTIVE', bankId, accountNumber, paymentModeId, qualificationIds, customerId, projectId,
+    employeeId, firstName, middleName, lastName, gender, dateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoPath, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, joiningDate, status = 'ACTIVE', bankId, accountNumber, accountHolderName, ifscCode, branchName, paymentModeId, qualificationIds, customerId, projectId,
     emergencyContactName, emergencyContactNumber, emergencyContactRelation, personalEmail, alternateNumber, maritalStatus, bloodGroup
   } = req.body;
 
@@ -411,13 +413,14 @@ export const updateEmployee = async (req: Request, res: Response) => {
     const formattedJoiningDate = formatDateForMySQL(joiningDate);
 
     const updateData = [
-      employeeId, firstName, middleName, lastName, gender, formattedDateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoPath, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, formattedJoiningDate, status, bankId, accountNumber, paymentModeId, customerId || null, projectId || null,
+      employeeId, firstName, middleName, lastName, gender, formattedDateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoPath, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, formattedJoiningDate, status, 
+      bankId, accountNumber, accountHolderName || null, ifscCode || null, branchName || null, paymentModeId, customerId || null, projectId || null,
       emergencyContactName || null, emergencyContactNumber || null, emergencyContactRelation || null, personalEmail || null, alternateNumber || null, maritalStatus || 'SINGLE', bloodGroup || null,
       id
     ];
 
     const [result]: any = await pool.query(
-      'UPDATE hrms_employees SET employee_id = ?, first_name = ?, middle_name = ?, last_name = ?, gender = ?, date_of_birth = ?, mobile = ?, email = ?, work_email = ?, address = ?, city = ?, state = ?, pincode = ?, photo_path = ?, manpower_type_id = ?, department_id = ?, designation_id = ?, work_location_id = ?, shift_id = ?, joining_date = ?, status = ?, bank_id = ?, account_number = ?, payment_mode_id = ?, customer_id = ?, project_id = ?, emergency_contact_name = ?, emergency_contact_number = ?, emergency_contact_relation = ?, personal_email = ?, alternate_number = ?, marital_status = ?, blood_group = ? WHERE id = ?',
+      'UPDATE hrms_employees SET employee_id = ?, first_name = ?, middle_name = ?, last_name = ?, gender = ?, date_of_birth = ?, mobile = ?, email = ?, work_email = ?, address = ?, city = ?, state = ?, pincode = ?, photo_path = ?, manpower_type_id = ?, department_id = ?, designation_id = ?, work_location_id = ?, shift_id = ?, joining_date = ?, status = ?, bank_id = ?, account_number = ?, account_holder_name = ?, ifsc_code = ?, branch_name = ?, payment_mode_id = ?, customer_id = ?, project_id = ?, emergency_contact_name = ?, emergency_contact_number = ?, emergency_contact_relation = ?, personal_email = ?, alternate_number = ?, marital_status = ?, blood_group = ? WHERE id = ?',
       updateData
     );
 
@@ -569,7 +572,8 @@ export const createEmployeeWithPhoto = async (req: Request, res: Response) => {
   } : 'No file uploaded');
 
   let {
-    employeeId, firstName, middleName, lastName, gender, dateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoPath, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, joiningDate, status = 'ACTIVE', bankId, accountNumber, paymentModeId, customerId, projectId,
+    employeeId, firstName, middleName, lastName, gender, dateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoPath, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, joiningDate, status = 'ACTIVE', 
+    bankId, accountNumber, accountHolderName, ifscCode, branchName, paymentModeId, customerId, projectId,
     emergencyContactName, emergencyContactNumber, emergencyContactRelation, personalEmail, alternateNumber, maritalStatus, bloodGroup
   } = req.body;
 
@@ -699,13 +703,14 @@ export const createEmployeeWithPhoto = async (req: Request, res: Response) => {
 
     console.log('=== DATABASE INSERTION START ===');
     const insertData = [
-      employeeId, firstName, middleName, lastName, gender, formattedDateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoFileName || photoPath, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, formattedJoiningDate, status, bankId, accountNumber, paymentModeId, customerId || null, projectId || null,
+      employeeId, firstName, middleName, lastName, gender, formattedDateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoFileName || photoPath, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, formattedJoiningDate, status, 
+      bankId, accountNumber, accountHolderName || null, ifscCode || null, branchName || null, paymentModeId, customerId || null, projectId || null,
       emergencyContactName || null, emergencyContactNumber || null, emergencyContactRelation || null, personalEmail || null, alternateNumber || null, maritalStatus || 'SINGLE', bloodGroup || null
     ];
     console.log('Insert parameters:', insertData);
 
     const [result]: any = await pool.query(
-      'INSERT INTO hrms_employees (employee_id, first_name, middle_name, last_name, gender, date_of_birth, mobile, email, work_email, address, city, state, pincode, photo_path, manpower_type_id, department_id, designation_id, work_location_id, shift_id, joining_date, status, bank_id, account_number, payment_mode_id, customer_id, project_id, emergency_contact_name, emergency_contact_number, emergency_contact_relation, personal_email, alternate_number, marital_status, blood_group) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO hrms_employees (employee_id, first_name, middle_name, last_name, gender, date_of_birth, mobile, email, work_email, address, city, state, pincode, photo_path, manpower_type_id, department_id, designation_id, work_location_id, shift_id, joining_date, status, bank_id, account_number, account_holder_name, ifsc_code, branch_name, payment_mode_id, customer_id, project_id, emergency_contact_name, emergency_contact_number, emergency_contact_relation, personal_email, alternate_number, marital_status, blood_group) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       insertData
     );
     console.log('=== DATABASE INSERTION SUCCESSFUL ===');
@@ -769,7 +774,7 @@ export const createEmployeeWithPhoto = async (req: Request, res: Response) => {
 export const updateEmployeeWithPhoto = async (req: Request, res: Response) => {
   const { id } = req.params;
   const {
-    employeeId, firstName, middleName, lastName, gender, dateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoPath, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, joiningDate, status = 'ACTIVE', bankId, accountNumber, paymentModeId, qualificationIds, customerId, projectId,
+    employeeId, firstName, middleName, lastName, gender, dateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoPath, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, joiningDate, status = 'ACTIVE', bankId, accountNumber, accountHolderName, ifscCode, branchName, paymentModeId, qualificationIds, customerId, projectId,
     emergencyContactName, emergencyContactNumber, emergencyContactRelation, personalEmail, alternateNumber, maritalStatus, bloodGroup
   } = req.body;
 
@@ -853,13 +858,14 @@ export const updateEmployeeWithPhoto = async (req: Request, res: Response) => {
     const formattedJoiningDate = formatDateForMySQL(joiningDate);
 
     const updateData = [
-      employeeId, firstName, middleName, lastName, gender, formattedDateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoFileName, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, formattedJoiningDate, status, bankId, accountNumber, paymentModeId, customerId || null, projectId || null,
+      employeeId, firstName, middleName, lastName, gender, formattedDateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoFileName, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, formattedJoiningDate, status, 
+      bankId, accountNumber, accountHolderName || null, ifscCode || null, branchName || null, paymentModeId, customerId || null, projectId || null,
       emergencyContactName || null, emergencyContactNumber || null, emergencyContactRelation || null, personalEmail || null, alternateNumber || null, maritalStatus || 'SINGLE', bloodGroup || null,
       id
     ];
 
     const [result]: any = await pool.query(
-      'UPDATE hrms_employees SET employee_id = ?, first_name = ?, middle_name = ?, last_name = ?, gender = ?, date_of_birth = ?, mobile = ?, email = ?, work_email = ?, address = ?, city = ?, state = ?, pincode = ?, photo_path = ?, manpower_type_id = ?, department_id = ?, designation_id = ?, work_location_id = ?, shift_id = ?, joining_date = ?, status = ?, bank_id = ?, account_number = ?, payment_mode_id = ?, customer_id = ?, project_id = ?, emergency_contact_name = ?, emergency_contact_number = ?, emergency_contact_relation = ?, personal_email = ?, alternate_number = ?, marital_status = ?, blood_group = ? WHERE id = ?',
+      'UPDATE hrms_employees SET employee_id = ?, first_name = ?, middle_name = ?, last_name = ?, gender = ?, date_of_birth = ?, mobile = ?, email = ?, work_email = ?, address = ?, city = ?, state = ?, pincode = ?, photo_path = ?, manpower_type_id = ?, department_id = ?, designation_id = ?, work_location_id = ?, shift_id = ?, joining_date = ?, status = ?, bank_id = ?, account_number = ?, account_holder_name = ?, ifsc_code = ?, branch_name = ?, payment_mode_id = ?, customer_id = ?, project_id = ?, emergency_contact_name = ?, emergency_contact_number = ?, emergency_contact_relation = ?, personal_email = ?, alternate_number = ?, marital_status = ?, blood_group = ? WHERE id = ?',
       updateData
     );
 

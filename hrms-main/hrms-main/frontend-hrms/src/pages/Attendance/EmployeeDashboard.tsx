@@ -46,7 +46,7 @@ const EmployeeDashboard: React.FC = () => {
   const [dialogs, setDialogs] = useState({ mark: false, manual: false, regularize: false });
 
   const [manualForm, setManualForm] = useState({
-    date: '',
+    date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()),
     check_in_time: '',
     check_out_time: '',
     reason: '',
@@ -57,6 +57,40 @@ const EmployeeDashboard: React.FC = () => {
     requested_change: '',
     reason: '',
   });
+
+  /**
+   * Format date to show only date part (YYYY-MM-DD) without timezone conversion
+   */
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '-';
+
+    // If already in YYYY-MM-DD format, return as is (most common case from backend)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      return dateString;
+    }
+
+    // If it's an ISO datetime string (contains 'T'), extract just the date part
+    // WITHOUT creating a Date object to avoid timezone conversion
+    if (typeof dateString === 'string' && dateString.includes('T')) {
+      return dateString.split('T')[0];
+    }
+
+    // For any other format, try to extract date using IST timezone
+    // This is a fallback for edge cases
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString;
+      // Use Intl.DateTimeFormat with IST timezone to get correct date
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(date);
+    } catch {
+      return dateString;
+    }
+  };
 
   const getTodayIST = () => {
     // Returns YYYY-MM-DD in IST
@@ -77,6 +111,32 @@ const EmployeeDashboard: React.FC = () => {
     const todayRec = records.find(r => r.date && r.date.startsWith(today));
     return todayRec && todayRec.check_in_time && !todayRec.check_out_time;
   }, [records, latestStatus]);
+
+  // Detect existing record for the manually selected date
+  const manualRecord = useMemo(() => {
+    if (!manualForm.date) return null;
+    return records.find(r => formatDate(r.date) === manualForm.date);
+  }, [manualForm.date, records]);
+
+  // Sync manual form with existing record
+  useEffect(() => {
+    if (manualRecord) {
+      setManualForm(prev => ({
+        ...prev,
+        check_in_time: manualRecord.check_in_time || '',
+        check_out_time: manualRecord.check_out_time || prev.check_out_time,
+      }));
+    } else {
+      // If user changes to a date with no record, we might want to clear pre-filled times
+      // but only if they were pre-filled (not if user typed them).
+      // For simplicity, we'll clear them to provide a fresh state for the new date.
+      setManualForm(prev => ({
+        ...prev,
+        check_in_time: '',
+        check_out_time: '',
+      }));
+    }
+  }, [manualRecord]);
 
   const loadData = async () => {
     try {
@@ -112,37 +172,6 @@ const EmployeeDashboard: React.FC = () => {
    * - BUT if displayed in IST, it shows as 2025-12-20 05:30:00 IST
    * - And if the original date was near midnight IST, it could shift to previous day
    */
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '-';
-
-    // If already in YYYY-MM-DD format, return as is (most common case from backend)
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-      return dateString;
-    }
-
-    // If it's an ISO datetime string (contains 'T'), extract just the date part
-    // WITHOUT creating a Date object to avoid timezone conversion
-    if (typeof dateString === 'string' && dateString.includes('T')) {
-      return dateString.split('T')[0];
-    }
-
-    // For any other format, try to extract date using IST timezone
-    // This is a fallback for edge cases
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return dateString;
-      // Use Intl.DateTimeFormat with IST timezone to get correct date
-      return new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Kolkata',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      }).format(date);
-    } catch {
-      return dateString;
-    }
-  };
-
   const calculateHours = (checkIn: string, checkOut: string) => {
     try {
       const [inHours, inMinutes] = checkIn.split(':').map(Number);
@@ -209,7 +238,13 @@ const EmployeeDashboard: React.FC = () => {
       const resp = await apiService.attendanceManual(manualForm);
       if (resp?.success) {
         setSnackbar({ open: true, message: 'Manual attendance submitted', severity: 'success' });
-        setManualForm({ date: '', check_in_time: '', check_out_time: '', reason: '' });
+        setManualForm({ 
+          date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()), 
+          check_in_time: '', 
+          check_out_time: '', 
+          reason: '' 
+        });
+        await loadData();
       } else {
         setSnackbar({ open: true, message: resp?.message || 'Submit failed', severity: 'error' });
       }
@@ -414,6 +449,7 @@ const EmployeeDashboard: React.FC = () => {
                       onChange={(e) => setManualForm({ ...manualForm, date: e.target.value })}
                       InputLabelProps={{ shrink: true }}
                       required
+                      disabled={!!manualRecord && !!manualRecord.check_in_time && !manualRecord.check_out_time}
                     />
                   </Grid>
                   <Grid item xs={12} md={3}>
@@ -424,6 +460,7 @@ const EmployeeDashboard: React.FC = () => {
                       value={manualForm.check_in_time}
                       onChange={(e) => setManualForm({ ...manualForm, check_in_time: e.target.value })}
                       InputLabelProps={{ shrink: true }}
+                      disabled={!!manualRecord && !!manualRecord.check_in_time}
                     />
                   </Grid>
                   <Grid item xs={12} md={3}>
@@ -434,6 +471,7 @@ const EmployeeDashboard: React.FC = () => {
                       value={manualForm.check_out_time}
                       onChange={(e) => setManualForm({ ...manualForm, check_out_time: e.target.value })}
                       InputLabelProps={{ shrink: true }}
+                      disabled={!!manualRecord && !!manualRecord.check_in_time && !!manualRecord.check_out_time}
                     />
                   </Grid>
                   <Grid item xs={12} md={3}>
@@ -442,9 +480,9 @@ const EmployeeDashboard: React.FC = () => {
                       variant="contained"
                       fullWidth
                       sx={{ height: '100%' }}
-                      disabled={loading}
+                      disabled={loading || (!!manualRecord && !!manualRecord.check_in_time && !!manualRecord.check_out_time)}
                     >
-                      Submit
+                      {manualRecord && manualRecord.check_in_time && manualRecord.check_out_time ? 'Completed' : 'Submit'}
                     </Button>
                   </Grid>
                   <Grid item xs={12}>
@@ -453,6 +491,7 @@ const EmployeeDashboard: React.FC = () => {
                       fullWidth
                       value={manualForm.reason}
                       onChange={(e) => setManualForm({ ...manualForm, reason: e.target.value })}
+                      disabled={!!manualRecord && !!manualRecord.check_in_time && !!manualRecord.check_out_time}
                     />
                   </Grid>
                   <Grid item xs={12}>
@@ -617,6 +656,7 @@ const EmployeeDashboard: React.FC = () => {
         open={dialogs.manual}
         onClose={() => setDialogs({ ...dialogs, manual: false })}
         onSubmit={onManualDialog}
+        records={records}
       />
       <RegularizationDialog
         open={dialogs.regularize}

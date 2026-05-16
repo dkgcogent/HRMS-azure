@@ -191,6 +191,9 @@ export interface Employee {
   maritalStatus?: 'SINGLE' | 'MARRIED' | 'DIVORCED' | 'WIDOWED';
   bloodGroup?: string;
   salary?: number;
+  accountHolderName?: string;
+  ifscCode?: string;
+  branchName?: string;
 }
 
 // Master data interfaces

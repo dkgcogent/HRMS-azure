@@ -123,6 +123,9 @@ const EmployeeForm: React.FC = () => {
     status: 'ACTIVE',
     bankId: 0,
     accountNumber: '',
+    accountHolderName: '',
+    ifscCode: '',
+    branchName: '',
     paymentModeId: 0,
     qualificationIds: [],
     isActive: true,
@@ -1503,6 +1506,15 @@ const EmployeeForm: React.FC = () => {
               </Grid>
               <Grid item xs={12} md={6}>
                 <TextField fullWidth label="Account Number" value={employee.accountNumber || ''} onChange={handleInputChange('accountNumber')} />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField fullWidth label="Account Holder Name" value={employee.accountHolderName || ''} onChange={handleInputChange('accountHolderName')} />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField fullWidth label="IFSC Code" value={employee.ifscCode || ''} onChange={handleInputChange('ifscCode')} />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField fullWidth label="Branch Name/Address" value={employee.branchName || ''} onChange={handleInputChange('branchName')} />
               </Grid>
               <Grid item xs={12} md={6}>
                 <FormControl fullWidth>
