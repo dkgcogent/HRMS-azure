@@ -87,6 +87,7 @@ const Sidebar: React.FC = () => {
     { text: 'Benefits', icon: <BenefitsIcon />, path: '/benefits/insurance', roles: ['admin'] },
     { text: 'Notifications', icon: <NotificationIcon />, path: '/communication/notifications', roles: ['admin'] },
     { text: 'Offer Letter', icon: <DocumentIcon />, path: '/documents/offer-letter', roles: ['admin'] },
+    { text: 'Letter', icon: <DocumentIcon />, path: '/documents/letters', roles: ['admin', 'hr'] },
     { text: 'Payslip', icon: <PaymentIcon />, path: '/payslips', roles: ['admin'] },
     { text: 'Appointment Letter', icon: <DocumentIcon />, path: '/documents/my-offer-letter', roles: ['employee'] },
     { text: 'My Attendance', icon: <ScheduleIcon />, path: '/attendance', roles: ['employee', 'hr'] },

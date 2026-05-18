@@ -6,636 +6,747 @@ import {
   Typography,
   Button,
   Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   TextField,
   Alert,
   Snackbar,
   Divider,
-  Chip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+  Card,
+  CardContent,
+  InputAdornment,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import {
-  Description as DocumentIcon,
-  Download as DownloadIcon,
-  Preview as PreviewIcon,
-  Send as SendIcon,
-  Save as SaveIcon,
+  Print as PrintIcon,
+  Clear as ClearIcon,
+  AutoFixHigh as MagicIcon,
 } from '@mui/icons-material';
 import { IMAGE_BASE_URL } from '../../services/api';
 
-interface LetterTemplate {
-  id: number;
-  name: string;
-  type: 'APPOINTMENT' | 'OFFER' | 'RECOMMENDATION' | 'EXPERIENCE' | 'RELIEVING' | 'WARNING' | 'APPRECIATION';
-  category: string;
-  template: string;
-  variables: string[];
-  isActive: boolean;
-}
+// --- Indian Number-to-Words Helper ---
+const numberToIndianWords = (num: number): string => {
+  if (isNaN(num) || num <= 0) return '';
 
-interface Employee {
-  id: number;
-  employeeId: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  departmentName: string;
-  designationName: string;
-  joiningDate: string;
-  salary?: number;
-  address?: string;
-  mobile: string;
-}
+  const ones = [
+    '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+    'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'
+  ];
+  
+  const tens = [
+    '', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'
+  ];
 
-interface LetterData {
-  templateId: number;
-  employeeId: number;
-  customVariables: Record<string, string>;
-  additionalContent?: string;
-  recipientEmail?: string;
-  subject?: string;
-}
+  const helper = (n: number): string => {
+    if (n < 20) return ones[n];
+    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + ones[n % 10] : '');
+    if (n < 1000) return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' and ' + helper(n % 100) : '');
+    return '';
+  };
+
+  let result = '';
+  let temp = Math.round(num);
+
+  if (Math.floor(temp / 10000000) > 0) {
+    result += helper(Math.floor(temp / 10000000)) + ' Crore ';
+    temp %= 10000000;
+  }
+  
+  if (Math.floor(temp / 100000) > 0) {
+    result += helper(Math.floor(temp / 100000)) + ' Lakh ';
+    temp %= 100000;
+  }
+  
+  if (Math.floor(temp / 1000) > 0) {
+    result += helper(Math.floor(temp / 1000)) + ' Thousand ';
+    temp %= 1000;
+  }
+  
+  if (temp > 0) {
+    if (result !== '' && temp < 100) {
+      result += 'and ' + helper(temp);
+    } else {
+      result += helper(temp);
+    }
+  }
+  
+  return result.trim() ? result.trim() + ' Only' : '';
+};
+
+// --- Format Indian Currency Figure ---
+const formatIndianCurrency = (val: string): string => {
+  const cleanVal = val.replace(/,/g, '');
+  if (!cleanVal || isNaN(Number(cleanVal))) return val;
+  const num = Number(cleanVal);
+  return num.toLocaleString('en-IN');
+};
 
 const LetterGenerationForm: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [templates, setTemplates] = useState<LetterTemplate[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<LetterTemplate | null>(null);
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-  const [customVariables, setCustomVariables] = useState<Record<string, string>>({});
-  const [previewDialog, setPreviewDialog] = useState(false);
-  const [generatedContent, setGeneratedContent] = useState('');
-  const [letterData, setLetterData] = useState<LetterData>({
-    templateId: 0,
-    employeeId: 0,
-    customVariables: {},
+  // Input fields state
+  const [formData, setFormData] = useState({
+    letterDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+    candidateName: '',
+    address: '',
+    greetingName: '',
+    position: '',
+    location: 'Gurgaon',
+    ctcFigure: '',
+    ctcWord: '',
+    joiningDate: '',
+    signatoryName: 'Authorized Signatory',
+    companyName: 'Cogent Logistics Private Limited'
   });
+
+  // Track print layout options (plain paper vs pre-printed letterhead) - Default to true for user pre-printed letterhead
+  const [hideHeaderInPrint, setHideHeaderInPrint] = useState(true);
+
+  // Highlight/focus tracking for interactive live preview
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+  
+  // Feedback snackbar
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
     severity: 'success' as 'success' | 'error' | 'warning'
   });
 
+  // Watch candidateName changes to auto-update greeting name
   useEffect(() => {
-    loadTemplates();
-    loadEmployees();
-  }, []);
-
-  const loadTemplates = async () => {
-    try {
-      setLoading(true);
-      // In real app: const response = await apiService.getLetterTemplates();
-      // Mock data
-      const mockTemplates: LetterTemplate[] = [
-        {
-          id: 1,
-          name: 'Appointment Letter',
-          type: 'APPOINTMENT',
-          category: 'Joining',
-          template: `Dear {{firstName}} {{lastName}},
-
-We are pleased to inform you that you have been selected for the position of {{designationName}} in the {{departmentName}} department at our organization.
-
-Your appointment is effective from {{joiningDate}} with a monthly salary of ₹{{salary}}.
-
-Please report to the HR department on your joining date with the required documents.
-
-We look forward to your valuable contribution to our organization.
-
-Best regards,
-HR Department`,
-          variables: ['firstName', 'lastName', 'designationName', 'departmentName', 'joiningDate', 'salary'],
-          isActive: true,
-        },
-        {
-          id: 2,
-          name: 'Offer Letter',
-          type: 'OFFER',
-          category: 'Recruitment',
-          template: `Dear {{firstName}} {{lastName}},
-
-We are delighted to extend an offer for the position of {{designationName}} in our {{departmentName}} department.
-
-Position Details:
-- Designation: {{designationName}}
-- Department: {{departmentName}}
-- Proposed Start Date: {{startDate}}
-- Annual CTC: ₹{{annualCTC}}
-
-This offer is valid until {{offerValidTill}}. Please confirm your acceptance by replying to this letter.
-
-We are excited about the possibility of you joining our team.
-
-Best regards,
-HR Department`,
-          variables: ['firstName', 'lastName', 'designationName', 'departmentName', 'startDate', 'annualCTC', 'offerValidTill'],
-          isActive: true,
-        },
-        {
-          id: 3,
-          name: 'Experience Certificate',
-          type: 'EXPERIENCE',
-          category: 'Exit',
-          template: `TO WHOM IT MAY CONCERN
-
-This is to certify that {{firstName}} {{lastName}} (Employee ID: {{employeeId}}) was employed with our organization from {{joiningDate}} to {{relievingDate}}.
-
-During the tenure, {{firstName}} worked as {{designationName}} in the {{departmentName}} department and has shown dedication and professionalism in all assigned tasks.
-
-We wish {{firstName}} all the best for future endeavors.
-
-Issued on: {{issueDate}}
-
-HR Department
-[Company Name]`,
-          variables: ['firstName', 'lastName', 'employeeId', 'joiningDate', 'relievingDate', 'designationName', 'departmentName', 'issueDate'],
-          isActive: true,
-        },
-        {
-          id: 4,
-          name: 'Recommendation Letter',
-          type: 'RECOMMENDATION',
-          category: 'Reference',
-          template: `TO WHOM IT MAY CONCERN
-
-I am pleased to recommend {{firstName}} {{lastName}} who worked as {{designationName}} in our {{departmentName}} department from {{joiningDate}} to {{relievingDate}}.
-
-{{firstName}} has consistently demonstrated {{qualities}} and has been a valuable team member. {{achievements}}
-
-I highly recommend {{firstName}} for any position that matches their skills and experience.
-
-Please feel free to contact me if you need any additional information.
-
-Best regards,
-{{recommenderName}}
-{{recommenderDesignation}}
-{{contactDetails}}`,
-          variables: ['firstName', 'lastName', 'designationName', 'departmentName', 'joiningDate', 'relievingDate', 'qualities', 'achievements', 'recommenderName', 'recommenderDesignation', 'contactDetails'],
-          isActive: true,
-        },
-      ];
-      setTemplates(mockTemplates);
-    } catch (error) {
-      console.error('Error loading templates:', error);
-    } finally {
-      setLoading(false);
+    if (formData.candidateName) {
+      const firstName = formData.candidateName.split(' ')[0];
+      setFormData(prev => ({
+        ...prev,
+        greetingName: firstName
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        greetingName: ''
+      }));
     }
-  };
+  }, [formData.candidateName]);
 
-  const loadEmployees = async () => {
-    try {
-      // In real app: const response = await apiService.getEmployees();
-      // Mock data
-      const mockEmployees: Employee[] = [
-        {
-          id: 1,
-          employeeId: 'EMP001',
-          firstName: 'John',
-          lastName: 'Doe',
-          email: 'john.doe@company.com',
-          departmentName: 'Information Technology',
-          designationName: 'Software Engineer',
-          joiningDate: '2023-01-15',
-          salary: 75000,
-          address: '123 Main Street, Mumbai',
-          mobile: '9876543210',
-        },
-        {
-          id: 2,
-          employeeId: 'EMP002',
-          firstName: 'Jane',
-          lastName: 'Smith',
-          email: 'jane.smith@company.com',
-          departmentName: 'Human Resources',
-          designationName: 'HR Manager',
-          joiningDate: '2022-06-01',
-          salary: 85000,
-          address: '456 Oak Avenue, Delhi',
-          mobile: '9876543211',
-        },
-      ];
-      setEmployees(mockEmployees);
-    } catch (error) {
-      console.error('Error loading employees:', error);
+  // Watch ctcFigure changes to auto-update ctcWord
+  useEffect(() => {
+    const rawVal = formData.ctcFigure.replace(/,/g, '');
+    if (rawVal && !isNaN(Number(rawVal))) {
+      const words = numberToIndianWords(Number(rawVal));
+      setFormData(prev => ({
+        ...prev,
+        ctcWord: words
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        ctcWord: ''
+      }));
     }
-  };
+  }, [formData.ctcFigure]);
 
-  const handleTemplateChange = (templateId: number) => {
-    const template = templates.find(t => t.id === templateId);
-    setSelectedTemplate(template || null);
-    setCustomVariables({});
-    setLetterData(prev => ({ ...prev, templateId }));
-  };
-
-  const handleEmployeeChange = (employeeId: number) => {
-    const employee = employees.find(e => e.id === employeeId);
-    setSelectedEmployee(employee || null);
-    setLetterData(prev => ({ ...prev, employeeId }));
-
-    // Auto-populate variables from employee data
-    if (employee && selectedTemplate) {
-      const autoVariables: Record<string, string> = {};
-      selectedTemplate.variables.forEach(variable => {
-        switch (variable) {
-          case 'firstName':
-            autoVariables[variable] = employee.firstName;
-            break;
-          case 'lastName':
-            autoVariables[variable] = employee.lastName;
-            break;
-          case 'employeeId':
-            autoVariables[variable] = employee.employeeId;
-            break;
-          case 'designationName':
-            autoVariables[variable] = employee.designationName;
-            break;
-          case 'departmentName':
-            autoVariables[variable] = employee.departmentName;
-            break;
-          case 'joiningDate':
-            autoVariables[variable] = new Date(employee.joiningDate).toLocaleDateString();
-            break;
-          case 'salary':
-            autoVariables[variable] = employee.salary?.toLocaleString() || '';
-            break;
-          case 'issueDate':
-            autoVariables[variable] = new Date().toLocaleDateString();
-            break;
-          default:
-            autoVariables[variable] = '';
-        }
-      });
-      setCustomVariables(autoVariables);
-    }
-  };
-
-  const handleVariableChange = (variable: string, value: string) => {
-    setCustomVariables(prev => ({
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({
       ...prev,
-      [variable]: value
+      [field]: value
     }));
   };
 
-  const generatePreview = () => {
-    if (!selectedTemplate || !selectedEmployee) {
-      setSnackbar({ open: true, message: 'Please select both template and employee', severity: 'warning' });
+  const handleFigureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawVal = e.target.value.replace(/[^0-9]/g, '');
+    handleInputChange('ctcFigure', formatIndianCurrency(rawVal));
+  };
+
+  const handleClear = () => {
+    setFormData({
+      letterDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+      candidateName: '',
+      address: '',
+      greetingName: '',
+      position: '',
+      location: 'Gurgaon',
+      ctcFigure: '',
+      ctcWord: '',
+      joiningDate: '',
+      signatoryName: 'Authorized Signatory',
+      companyName: 'Cogent Logistics Private Limited'
+    });
+
+    setSnackbar({
+      open: true,
+      message: 'Form cleared successfully',
+      severity: 'info'
+    });
+  };
+
+  const handlePrint = () => {
+    if (!formData.candidateName || !formData.position || !formData.ctcFigure || !formData.joiningDate) {
+      setSnackbar({
+        open: true,
+        message: 'Please fill in Name, Position, CTC and Joining Date before printing',
+        severity: 'warning'
+      });
       return;
     }
 
-    let content = selectedTemplate.template;
-
-    // Replace variables with actual values
-    Object.entries(customVariables).forEach(([variable, value]) => {
-      const regex = new RegExp(`{{${variable}}}`, 'g');
-      content = content.replace(regex, value || `[${variable}]`);
+    setSnackbar({
+      open: true,
+      message: 'Generating print layout...',
+      severity: 'success'
     });
 
-    setGeneratedContent(content);
-    setPreviewDialog(true);
+    setTimeout(() => {
+      window.print();
+    }, 500);
   };
 
-  const downloadLetter = () => {
-    const blob = new Blob([generatedContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${selectedTemplate?.name}_${selectedEmployee?.employeeId}_${new Date().toISOString().split('T')[0]}.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
+  const getHighlightedStyle = (field: string) => {
+    const isActive = focusedField === field;
+    return {
+      backgroundColor: isActive ? 'rgba(255, 235, 59, 0.45)' : 'transparent',
+      padding: isActive ? '1px 4px' : '0px',
+      borderRadius: isActive ? '4px' : '0px',
+      transition: 'all 0.3s ease',
+      borderBottom: isActive ? '2px solid #ff9800' : 'none',
+      display: 'inline',
+      fontWeight: isActive ? 600 : 'inherit',
+    };
   };
 
-  const sendEmail = async () => {
-    try {
-      setLoading(true);
-      // In real app: await apiService.sendLetterByEmail({
-      //   to: selectedEmployee?.email,
-      //   subject: letterData.subject || selectedTemplate?.name,
-      //   content: generatedContent
-      // });
-
-      setSnackbar({ open: true, message: 'Letter sent successfully via email!', severity: 'success' });
-      setPreviewDialog(false);
-    } catch (error) {
-      console.error('Error sending email:', error);
-      setSnackbar({ open: true, message: 'Error sending email. Please try again.', severity: 'error' });
-    } finally {
-      setLoading(false);
-    }
+  const capitalizeWords = (str: string) => {
+    if (!str) return '';
+    return str.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
   };
 
-  const saveLetter = async () => {
-    try {
-      setLoading(true);
-      // In real app: await apiService.saveGeneratedLetter({
-      //   ...letterData,
-      //   content: generatedContent,
-      //   generatedDate: new Date().toISOString()
-      // });
+  const formatDateString = (dateStr: string) => {
+    if (!dateStr) return '...............................';
+    const dateObj = new Date(dateStr);
+    if (isNaN(dateObj.getTime())) return dateStr;
+    
+    // Add ordinal suffix for day
+    const day = dateObj.getDate();
+    let suffix = 'th';
+    if (day === 1 || day === 21 || day === 31) suffix = 'st';
+    else if (day === 2 || day === 22) suffix = 'nd';
+    else if (day === 3 || day === 23) suffix = 'rd';
 
-      setSnackbar({ open: true, message: 'Letter saved successfully!', severity: 'success' });
-      setPreviewDialog(false);
-    } catch (error) {
-      console.error('Error saving letter:', error);
-      setSnackbar({ open: true, message: 'Error saving letter. Please try again.', severity: 'error' });
-    } finally {
-      setLoading(false);
-    }
+    const monthStr = dateObj.toLocaleString('en-US', { month: 'short' });
+    const yearStr = dateObj.getFullYear();
+    return `${day}${suffix} ${monthStr} ${yearStr}`;
   };
+
+  const checklistItems = [
+    'Date of Birth certificate,(Class X Certificate)',
+    'Class XII Mark sheet.',
+    'Qualifying certificate and mark sheets of your professional qualifications.',
+    'Last salary slips from the previous organization. (If applicable)',
+    'Clearance/Non-Dues certificate & resignation acceptance letter from previous employer.',
+    'Four passport size photos, one each for dependents.',
+    'Copy of the Pan Card & Aadhar Card.',
+    'Address proof copy of Ration Card / Voter Card/Passport.',
+    'Any other documents, as and when required.'
+  ];
 
   return (
-    <Box>
-      <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mb: 1 }}>
-        Letter Generation
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Generate automatic letters using predefined templates.
-      </Typography>
-      <Paper elevation={2} sx={{ p: 3 }}>
-        <Grid container spacing={3}>
-          {/* Template Selection */}
-          <Grid size={12}>
-            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <DocumentIcon />
-              Letter Template
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-          </Grid>
+    <Box sx={{ width: '100%', py: 1 }}>
+      {/* Global CSS for printing perfect single A4 sheets */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 0;
+          }
+          body {
+            margin: 0;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          body * {
+            visibility: hidden;
+          }
+          #print-container, #print-container * {
+            visibility: visible;
+          }
+          #print-container {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0;
+            padding: 0;
+            background: white !important;
+            box-shadow: none !important;
+          }
+          .print-page {
+            width: 100% !important;
+            max-width: 100% !important;
+            height: 297mm;
+            max-height: 297mm;
+            display: flex !important;
+            flex-direction: column !important;
+            padding: ${hideHeaderInPrint ? '55mm' : '12mm'} 20mm ${hideHeaderInPrint ? '30mm' : '10mm'} 20mm !important;
+            box-sizing: border-box;
+            background: white !important;
+            color: black !important;
+            page-break-after: avoid !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            overflow: hidden !important;
+            position: relative;
+            box-shadow: none !important;
+            border: none !important;
+            margin: 0 !important;
+          }
+          .print-header {
+            display: ${hideHeaderInPrint ? 'none' : 'flex'} !important;
+          }
+          .print-footer {
+            display: none !important;
+          }
+        }
+      `}} />
 
-          <Grid
-            size={{
-              xs: 12,
-              md: 6
-            }}>
-            <FormControl fullWidth required>
-              <InputLabel id="letter-template-label" shrink={!!selectedTemplate?.id || true}>Select Template</InputLabel>
-              <Select
-                labelId="letter-template-label"
-                value={selectedTemplate?.id || ''}
-                label="Select Template"
-                onChange={(e) => handleTemplateChange(e.target.value as number)}
-                displayEmpty
-                renderValue={(selected: any) => {
-                  if (!selected || selected === '' || selected === null || selected === undefined) {
-                    return <span style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '0.875rem', display: 'inline-block', overflow: 'visible', textOverflow: 'clip', whiteSpace: 'nowrap', width: '100%' }}>Select Template</span>;
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+        <Box>
+          <Typography variant="h4" fontWeight="800" sx={{ background: 'linear-gradient(45deg, #1e3c72 0%, #2a5298 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', mb: 0.5 }}>
+            Offer Letter Workspace
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Develop and print pixel-perfect single-page offer letters with real-time formatting.
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1.5 }}>
+          <Button
+            variant="outlined"
+            color="secondary"
+            startIcon={<ClearIcon />}
+            onClick={handleClear}
+            sx={{ borderRadius: 2, textTransform: 'none', px: 2 }}
+          >
+            Clear Form
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<PrintIcon />}
+            onClick={handlePrint}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              px: 3,
+              boxShadow: '0 4px 14px rgba(30, 60, 114, 0.3)',
+              background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #122548 0%, #1e3c72 100%)',
+              }
+            }}
+          >
+            Print / Save PDF
+          </Button>
+        </Box>
+      </Box>
+
+      <Grid container spacing={4}>
+        {/* LEFT COLUMN: Modern Glassmorphic Form Inputs */}
+        <Grid item xs={12} lg={5}>
+          <Card
+            elevation={4}
+            sx={{
+              borderRadius: 4,
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(10px)',
+              position: 'sticky',
+              top: 24,
+              zIndex: 10,
+              maxHeight: 'calc(100vh - 120px)',
+              overflowY: 'auto',
+            }}
+          >
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" fontWeight="700" color="primary.main" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <MagicIcon fontSize="small" /> Letter Details
+              </Typography>
+              <Divider sx={{ mb: 2.5 }} />
+
+              {/* Dynamic print letterhead toggler */}
+              <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1, backgroundColor: 'rgba(30, 60, 114, 0.04)', p: 1.5, borderRadius: 2, border: '1px solid rgba(30, 60, 114, 0.08)' }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={hideHeaderInPrint}
+                      onChange={(e) => setHideHeaderInPrint(e.target.checked)}
+                      color="primary"
+                    />
                   }
-                  const template = templates.find(t => t.id === selected);
-                  return <span style={{ color: 'rgba(0, 0, 0, 0.87)', fontSize: '0.875rem', display: 'inline-block', overflow: 'visible', textOverflow: 'clip', whiteSpace: 'nowrap' }}>{template?.name || String(selected)}</span>;
-                }}
-                sx={{
-                  '& .MuiSelect-select': {
-                    paddingLeft: '20px !important',
-                    paddingRight: '40px !important',
-                    paddingTop: '14px !important',
-                    paddingBottom: '14px !important',
-                    overflow: 'visible !important',
-                    textOverflow: 'clip !important',
-                    whiteSpace: 'nowrap !important',
-                    width: '100% !important',
-                    boxSizing: 'border-box',
-                    '@media (max-width:600px)': {
-                      paddingLeft: '16px !important',
-                      paddingRight: '32px !important',
-                      paddingTop: '10px !important',
-                      paddingBottom: '10px !important',
-                    },
-                  },
-                  '& .MuiSelect-select > span': {
-                    overflow: 'visible !important',
-                    textOverflow: 'clip !important',
-                    whiteSpace: 'nowrap !important',
-                    maxWidth: 'none !important',
-                    width: 'auto !important',
-                  },
-                }}
-              >
-                {templates.map((template) => (
-                  <MenuItem key={template.id} value={template.id}>
+                  label={
                     <Box>
-                      <Typography variant="body2">{template.name}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {template.category} • {template.type}
-                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1e3c72' }}>Print on Pre-printed Letterhead</Typography>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.2 }}>Hides corporate header for physical paper.</Typography>
                     </Box>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid
-            size={{
-              xs: 12,
-              md: 6
-            }}>
-            <FormControl fullWidth required>
-              <InputLabel id="letter-employee-label" shrink={!!selectedEmployee?.id || true}>Select Employee</InputLabel>
-              <Select
-                labelId="letter-employee-label"
-                value={selectedEmployee?.id || ''}
-                label="Select Employee"
-                onChange={(e) => handleEmployeeChange(e.target.value as number)}
-                displayEmpty
-                renderValue={(selected: any) => {
-                  if (!selected || selected === '' || selected === null || selected === undefined) {
-                    return <span style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '0.875rem', display: 'inline-block', overflow: 'visible', textOverflow: 'clip', whiteSpace: 'nowrap', width: '100%' }}>Select Employee</span>;
                   }
-                  const emp = employees.find(e => e.id === selected);
-                  return <span style={{ color: 'rgba(0, 0, 0, 0.87)', fontSize: '0.875rem', display: 'inline-block', overflow: 'visible', textOverflow: 'clip', whiteSpace: 'nowrap' }}>{emp ? `${emp.firstName} ${emp.lastName} (${emp.employeeId})` : String(selected)}</span>;
-                }}
-                sx={{
-                  '& .MuiSelect-select': {
-                    paddingLeft: '20px !important',
-                    paddingRight: '40px !important',
-                    paddingTop: '14px !important',
-                    paddingBottom: '14px !important',
-                    overflow: 'visible !important',
-                    textOverflow: 'clip !important',
-                    whiteSpace: 'nowrap !important',
-                    width: '100% !important',
-                    boxSizing: 'border-box',
-                    '@media (max-width:600px)': {
-                      paddingLeft: '16px !important',
-                      paddingRight: '32px !important',
-                      paddingTop: '10px !important',
-                      paddingBottom: '10px !important',
-                    },
-                  },
-                  '& .MuiSelect-select > span': {
-                    overflow: 'visible !important',
-                    textOverflow: 'clip !important',
-                    whiteSpace: 'nowrap !important',
-                    maxWidth: 'none !important',
-                    width: 'auto !important',
-                  },
-                }}
-              >
-                {employees.map((employee) => (
-                  <MenuItem key={employee.id} value={employee.id}>
-                    <Box>
-                      <Typography variant="body2">
-                        {employee.firstName} {employee.lastName} ({employee.employeeId})
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {employee.departmentName} • {employee.designationName}
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          {/* Template Variables */}
-          {selectedTemplate && (
-            <>
-              <Grid size={12}>
-                <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-                  Template Variables
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-              </Grid>
-
-              {selectedTemplate.variables.map((variable) => (
-                <Grid
-                  key={variable}
-                  size={{
-                    xs: 12,
-                    md: 6
-                  }}>
-                  <TextField
-                    fullWidth
-                    label={variable.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-                    value={customVariables[variable] || ''}
-                    onChange={(e) => handleVariableChange(variable, e.target.value)}
-                    placeholder={`Enter ${variable}`}
-                  />
-                </Grid>
-              ))}
-
-              <Grid size={12}>
-                <TextField
-                  fullWidth
-                  label="Additional Content (Optional)"
-                  multiline
-                  rows={3}
-                  value={letterData.additionalContent || ''}
-                  onChange={(e) => setLetterData(prev => ({ ...prev, additionalContent: e.target.value }))}
-                  placeholder="Add any additional content to be included in the letter..."
-                />
-              </Grid>
-
-              <Grid size={12}>
-                <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-                  <Button
-                    variant="contained"
-                    startIcon={<PreviewIcon />}
-                    onClick={generatePreview}
-                    disabled={!selectedTemplate || !selectedEmployee}
-                  >
-                    Preview Letter
-                  </Button>
-                  <Chip
-                    label={`${selectedTemplate.variables.length} variables`}
-                    size="small"
-                    color="info"
-                  />
-                  <Chip
-                    label={selectedTemplate.category}
-                    size="small"
-                    color="primary"
-                  />
-                </Box>
-              </Grid>
-            </>
-          )}
-        </Grid>
-      </Paper>
-      {/* Preview Dialog */}
-      <Dialog open={previewDialog} onClose={() => setPreviewDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>
-          Letter Preview - {selectedTemplate?.name}
-        </DialogTitle>
-        <DialogContent>
-          <Paper variant="outlined" sx={{ p: 3, mb: 2, backgroundColor: '#fff' }}>
-            {(selectedTemplate?.type === 'OFFER' || selectedTemplate?.name.toLowerCase().includes('offer')) && (
-              <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center', borderBottom: '1px solid #eee', pb: 2 }}>
-                <img
-                  src={`${IMAGE_BASE_URL}/uploads/assets/offer_header.jpeg`}
-                  alt="Letter Header"
-                  style={{ maxWidth: '100%', height: 'auto', maxHeight: '100px' }}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
+                  sx={{ m: 0, width: '100%', justifyContent: 'space-between', flexDirection: 'row-reverse' }}
                 />
               </Box>
-            )}
-            <Typography variant="body1" sx={{ whiteSpace: 'pre-line', fontFamily: 'monospace' }}>
-              {generatedContent}
-            </Typography>
-          </Paper>
 
-          <Grid container spacing={2}>
-            <Grid
-              size={{
-                xs: 12,
-                md: 6
-              }}>
-              <TextField
-                fullWidth
-                label="Email Subject"
-                value={letterData.subject || selectedTemplate?.name}
-                onChange={(e) => setLetterData(prev => ({ ...prev, subject: e.target.value }))}
-              />
-            </Grid>
-            <Grid
-              size={{
-                xs: 12,
-                md: 6
-              }}>
-              <TextField
-                fullWidth
-                label="Recipient Email"
-                value={letterData.recipientEmail || selectedEmployee?.email}
-                onChange={(e) => setLetterData(prev => ({ ...prev, recipientEmail: e.target.value }))}
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPreviewDialog(false)}>Close</Button>
-          <Button
-            startIcon={<SaveIcon />}
-            onClick={saveLetter}
-            disabled={loading}
-          >
-            Save Letter
-          </Button>
-          <Button
-            startIcon={<DownloadIcon />}
-            onClick={downloadLetter}
-            variant="outlined"
-          >
-            Download
-          </Button>
-          <Button
-            startIcon={<SendIcon />}
-            onClick={sendEmail}
-            variant="contained"
-            disabled={loading}
-          >
-            Send Email
-          </Button>
-        </DialogActions>
-      </Dialog>
+              <Grid container spacing={2}>
+                {/* 1. Date */}
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Offer Date"
+                    value={formData.letterDate}
+                    onChange={(e) => handleInputChange('letterDate', e.target.value)}
+                    onFocus={() => setFocusedField('letterDate')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="e.g. Dec 23rd, 2025"
+                  />
+                </Grid>
+
+                {/* 2. Candidate Name */}
+                <Grid item xs={12}>
+                  <TextField
+                    required
+                    fullWidth
+                    size="small"
+                    label="Candidate Name"
+                    value={formData.candidateName}
+                    onChange={(e) => handleInputChange('candidateName', e.target.value)}
+                    onFocus={() => setFocusedField('candidateName')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="Mr. Kishore Kumar"
+                  />
+                </Grid>
+
+                {/* 3. Address */}
+                <Grid item xs={12}>
+                  <TextField
+                    required
+                    fullWidth
+                    size="small"
+                    label="Address"
+                    multiline
+                    rows={2.5}
+                    value={formData.address}
+                    onChange={(e) => handleInputChange('address', e.target.value)}
+                    onFocus={() => setFocusedField('address')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="Line 1&#10;Line 2&#10;Line 3"
+                  />
+                </Grid>
+
+                {/* 4. Greeting Name */}
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Greeting Name"
+                    value={formData.greetingName}
+                    onChange={(e) => handleInputChange('greetingName', e.target.value)}
+                    onFocus={() => setFocusedField('greetingName')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="Kishore"
+                    helperText="Auto-populated, editable."
+                  />
+                </Grid>
+
+                {/* 5. Position */}
+                <Grid item xs={12}>
+                  <TextField
+                    required
+                    fullWidth
+                    size="small"
+                    label="Position / Designation"
+                    value={formData.position}
+                    onChange={(e) => handleInputChange('position', e.target.value)}
+                    onFocus={() => setFocusedField('position')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="e.g. Senior Logistics Coordinator"
+                  />
+                </Grid>
+
+                {/* 6. Location */}
+                <Grid item xs={12}>
+                  <TextField
+                    required
+                    fullWidth
+                    size="small"
+                    label="Location"
+                    value={formData.location}
+                    onChange={(e) => handleInputChange('location', e.target.value)}
+                    onFocus={() => setFocusedField('location')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="e.g. Gurgaon"
+                  />
+                </Grid>
+
+                {/* 7. CTC in Figure */}
+                <Grid item xs={12}>
+                  <TextField
+                    required
+                    fullWidth
+                    size="small"
+                    label="Annual CTC (in Figure)"
+                    value={formData.ctcFigure}
+                    onChange={handleFigureChange}
+                    onFocus={() => setFocusedField('ctcFigure')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="e.g. 5,00,000"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.secondary', fontSize: '10pt' }}>₹</Typography>
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Grid>
+
+                {/* 8. CTC in Word */}
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Annual CTC (in Word)"
+                    value={formData.ctcWord}
+                    onChange={(e) => handleInputChange('ctcWord', e.target.value)}
+                    onFocus={() => setFocusedField('ctcWord')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="e.g. Five Lakh Only"
+                    helperText="Auto-computed in Indian numbering format."
+                  />
+                </Grid>
+
+                {/* 9. Date of Joining */}
+                <Grid item xs={12}>
+                  <TextField
+                    required
+                    fullWidth
+                    size="small"
+                    type="date"
+                    label="Date of Joining"
+                    value={formData.joiningDate}
+                    onChange={(e) => handleInputChange('joiningDate', e.target.value)}
+                    onFocus={() => setFocusedField('joiningDate')}
+                    onBlur={() => setFocusedField(null)}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* RIGHT COLUMN: Realistic Live Print Preview */}
+        <Grid item xs={12} lg={7} sx={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
+          
+          {/* Real-time binds container */}
+          <Box id="print-container" sx={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '210mm' }}>
+            
+            {/* --- SINGLE PAGE SHEET --- */}
+            <Paper
+              className="print-page"
+              elevation={3}
+              sx={{
+                width: '100%',
+                height: '297mm',
+                maxHeight: '297mm',
+                padding: hideHeaderInPrint ? '55mm 20mm 30mm 20mm' : '12mm 20mm 10mm 20mm',
+                boxSizing: 'border-box',
+                background: '#ffffff',
+                fontFamily: '"Georgia", "Times New Roman", serif',
+                fontSize: '12.5pt',
+                lineHeight: 1.4,
+                color: '#222222',
+                position: 'relative',
+                borderRadius: 2,
+                border: '1px solid #e0e0e0',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+              }}
+            >
+              {/* On-screen Watermarked Pre-printed Header (Only visible on screen, hidden in print) */}
+              {hideHeaderInPrint && (
+                <Box className="print-header" sx={{ 
+                  position: 'absolute', 
+                  top: '10mm', 
+                  left: '18mm', 
+                  right: '18mm', 
+                  opacity: 0.3, 
+                  pointerEvents: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderBottom: '1.5px solid #000',
+                  pb: 0.8,
+                  zIndex: 10
+                }}>
+                  <Box sx={{ mr: 2, display: 'flex', alignItems: 'center' }}>
+                    <Typography variant="h5" sx={{ fontFamily: '"Arial Black", sans-serif', fontWeight: 900, color: '#1e3c72', display: 'flex', alignItems: 'center', letterSpacing: '-1px' }}>
+                      c<span style={{ color: '#00c6ff', fontSize: '26px' }}>●</span>gent<span style={{ fontSize: '11px', verticalAlign: 'super', marginLeft: '2px', fontWeight: 'normal' }}>es</span>
+                    </Typography>
+                  </Box>
+                  <Box sx={{ flex: 1, textAlign: 'left', pl: 2, borderLeft: '1px solid #ccc' }}>
+                    <Typography sx={{ fontFamily: '"Georgia", serif', fontSize: '10pt', fontWeight: 'bold', color: '#1e3c72', lineHeight: 1.1 }}>
+                      Cogent Logistics Private Limited
+                    </Typography>
+                    <Typography sx={{ fontFamily: 'sans-serif', fontSize: '7pt', color: '#555', lineHeight: 1.1 }}>
+                      201C/6, Second Floor, D-21 Corporate Park, Sector.-21, Dwarka, New Delhi - 110077 India
+                    </Typography>
+                    <Typography sx={{ fontFamily: 'sans-serif', fontSize: '6.5pt', color: '#555', lineHeight: 1.1 }}>
+                      E mail: info@cogentlogistics.in, Web: www.cogentlogistics.in, Phone: +91 11 41099971
+                    </Typography>
+                    <Typography sx={{ fontFamily: 'sans-serif', fontSize: '6.5pt', color: '#555', fontWeight: 'bold', lineHeight: 1.1 }}>
+                      CIN No.: U63040DL2013PTC260297
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+
+              {/* On-screen Watermarked Pre-printed Footer (Only visible on screen, hidden in print) */}
+              {hideHeaderInPrint && (
+                <Box className="print-footer" sx={{ 
+                  position: 'absolute', 
+                  bottom: '8mm', 
+                  left: '18mm', 
+                  right: '18mm', 
+                  opacity: 0.3, 
+                  pointerEvents: 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  borderTop: '1.5px solid #000',
+                  pt: 0.8,
+                  zIndex: 10,
+                  textAlign: 'center'
+                }}>
+                  <Typography sx={{ fontFamily: 'sans-serif', fontSize: '7pt', color: '#000', fontWeight: 'bold', letterSpacing: '0.2px', lineHeight: 1.2 }}>
+                    SHOP NO. 22, CSC II, DDA MARKET, INDRAPRASTHA EXTN., PATPARGANJ, OPP. BALCO APARTMENT
+                  </Typography>
+                  <Typography sx={{ fontFamily: 'sans-serif', fontSize: '7pt', color: '#000', fontWeight: 'bold', lineHeight: 1.2 }}>
+                    East Delhi, Delhi, India, 110092
+                  </Typography>
+                </Box>
+              )}
+
+              {/* Header section (Uses official header image when not printing on pre-printed letterhead) */}
+              {!hideHeaderInPrint && (
+                <Box className="print-header" sx={{ width: '100%', mb: 1.5, display: 'flex', justifyContent: 'center' }}>
+                  <img
+                    src={`${IMAGE_BASE_URL}/uploads/assets/offer_header.jpeg`}
+                    alt="Cogent Logistics Header"
+                    style={{ width: '100%', height: 'auto', maxHeight: '115px', objectFit: 'contain' }}
+                  />
+                </Box>
+              )}
+
+              {/* Candidate Info & Date Row (Aligning Mr./Ms. and Date on the same horizontal line) */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+                {/* Left Side: Candidate Name & Address */}
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.2, maxWidth: '65%' }}>
+                  <Typography sx={{ fontSize: '12.5pt', fontFamily: 'inherit', fontWeight: 'bold' }}>
+                    Mr./Ms. <span style={getHighlightedStyle('candidateName')}>{capitalizeWords(formData.candidateName) || '...............................'}</span>
+                  </Typography>
+                  <Typography sx={{ fontSize: '12.5pt', fontFamily: 'inherit', whiteSpace: 'pre-line', fontStyle: 'italic', pl: 1, borderLeft: '2px solid rgba(0,0,0,0.06)' }}>
+                    <span style={getHighlightedStyle('address')}>{formData.address || 'Address Line 1\nAddress Line 2\nAddress Line 3'}</span>
+                  </Typography>
+                </Box>
+
+                {/* Right Side: Date */}
+                <Box sx={{ textAlign: 'right', pt: 0.2 }}>
+                  <Typography sx={{ fontSize: '12.5pt', fontFamily: 'inherit' }}>
+                    <strong>Date:</strong> <span style={getHighlightedStyle('letterDate')}>{formData.letterDate || '...............................'}</span>
+                  </Typography>
+                </Box>
+              </Box>
+
+              {/* Subject Line */}
+              <Box sx={{ textAlign: 'center', mb: 3.5 }}>
+                <Typography sx={{ fontSize: '13.5pt', fontFamily: 'inherit', fontWeight: 'bold', textDecoration: 'underline' }}>
+                  Subject: Offer Letter
+                </Typography>
+              </Box>
+
+              {/* Greeting */}
+              <Box sx={{ mb: 1 }}>
+                <Typography sx={{ fontSize: '12.5pt', fontFamily: 'inherit' }}>
+                  Dear <span style={getHighlightedStyle('greetingName')}>{capitalizeWords(formData.greetingName) || '...............................'}</span>,
+                </Typography>
+              </Box>
+
+              {/* Body Paragraph 1 */}
+              <Box sx={{ mb: 1.5 }}>
+                <Typography sx={{ fontSize: '12.5pt', fontFamily: 'inherit', textAlign: 'justify' }}>
+                  With reference to your application for employment and our subsequent meeting, we are pleased to inform you that you have been selected for the post of <span style={getHighlightedStyle('position')}><strong>{capitalizeWords(formData.position) || '...............................'}</strong></span> to be posted at - <span style={getHighlightedStyle('location')}><strong>{capitalizeWords(formData.location) || 'Gurgaon'}</strong></span> Location.
+                </Typography>
+              </Box>
+
+              {/* Body Paragraph 2 */}
+              <Box sx={{ mb: 1.5 }}>
+                <Typography sx={{ fontSize: '12.5pt', fontFamily: 'inherit', textAlign: 'justify' }}>
+                  Your CTC would be <strong>Rs. <span style={getHighlightedStyle('ctcFigure')}>{formData.ctcFigure || '...............................'}</span>/-</strong> (Rupees <span style={getHighlightedStyle('ctcWord')}><em>{formData.ctcWord || '......................................................................'}</em></span>) per annum. Other terms and conditions would be given to you with your appointment letter at the time of joining.
+                </Typography>
+              </Box>
+
+              {/* Body Paragraph 3 */}
+              <Box sx={{ mb: 2 }}>
+                <Typography sx={{ fontSize: '12.5pt', fontFamily: 'inherit', textAlign: 'justify' }}>
+                  You are hereby requested to join our Company on <span style={getHighlightedStyle('joiningDate')}><strong>{formatDateString(formData.joiningDate)}</strong></span> and return a signed copy of this Offer Letter to our office within 2 days of the date of this Offer Letter, after which this Offer Letter shall no longer be valid.
+                </Typography>
+              </Box>
+
+              <Divider sx={{ my: 3, opacity: 0.5 }} />
+
+              {/* Checklist Section */}
+              <Box sx={{ mb: 1 }}>
+                <Typography sx={{ fontSize: '11.5pt', fontFamily: 'inherit', fontWeight: 'bold' }}>
+                  You are required to bring the following on the day of joining:
+                </Typography>
+              </Box>
+
+              {/* Single-Column Professional Checklist Layout */}
+              <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', gap: 0.7 }}>
+                {checklistItems.map((item, idx) => (
+                  <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.2 }}>
+                    <Typography sx={{ fontWeight: 'bold', fontSize: '10.5pt', minWidth: '15px' }}>{idx + 1}.</Typography>
+                    <Typography sx={{ fontSize: '10.5pt', fontFamily: 'inherit', textAlign: 'justify', lineHeight: 1.25 }}>{item}</Typography>
+                  </Box>
+                ))}
+              </Box>
+
+              {/* Closing note */}
+              <Box sx={{ mb: 3 }}>
+                <Typography sx={{ fontSize: '11.5pt', fontFamily: 'inherit', fontStyle: 'italic', color: '#444' }}>
+                  We are sure that you will have a beneficial and long-term association with us. Congratulations and best of Luck!
+                </Typography>
+              </Box>
+
+              {/* Regards bottom layout block */}
+              <Box sx={{ mt: 'auto', display: 'flex', justifyContent: 'flex-start', pb: 0.5 }}>
+                {/* Regards & Company Sign block */}
+                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                  <Typography sx={{ fontSize: '11.5pt', fontFamily: 'inherit' }}>Regards,</Typography>
+                  <Typography sx={{ fontSize: '11.5pt', fontFamily: 'inherit', fontWeight: 'bold', fontStyle: 'italic', color: '#1e3c72', mt: 0.5 }}>
+                    For Cogent Logistics Private Limited
+                  </Typography>
+                  
+                  <Box sx={{ py: 1, display: 'flex', flexDirection: 'column' }}>
+                    <Box sx={{ borderBottom: '1px dotted rgba(0,0,0,0.25)', width: '140px', height: '22px' }} />
+                    <Typography sx={{ fontSize: '10.5pt', fontFamily: 'inherit', fontWeight: 'bold', color: '#555555', mt: 0.5 }}>
+                      Authorized Signatory
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+
+            </Paper>
+
+          </Box>
+        </Grid>
+      </Grid>
+
+      {/* Snackbar feedback notification */}
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={6000}
+        autoHideDuration={4000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
@@ -643,6 +754,7 @@ Best regards,
           severity={snackbar.severity}
           onClose={() => setSnackbar({ ...snackbar, open: false })}
           variant="filled"
+          sx={{ borderRadius: 2 }}
         >
           {snackbar.message}
         </Alert>
