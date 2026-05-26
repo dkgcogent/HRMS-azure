@@ -29,6 +29,7 @@ import {
   TableRow,
   Tooltip,
   Checkbox,
+  Autocomplete,
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -43,7 +44,7 @@ import {
   Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Employee, apiService, API_BASE_URL, IMAGE_BASE_URL, getPublicUrl } from '../../services/api';
+import { Employee, apiService, getPublicUrl } from '../../services/api';
 
 // Create a Grid component that always includes component="div" for Grid items
 const Grid = (props: GridProps & {
@@ -341,25 +342,6 @@ const EmployeeForm: React.FC = () => {
     }));
   };
 
-  const handleCustomerChange = (event: SelectChangeEvent<any>) => {
-    const customerId = parseInt(event.target.value as string, 10);
-    const customer = customers.find(c => c.id === customerId);
-    setEmployee(prev => ({
-      ...prev,
-      customerId: customerId,
-      customerCode: customer?.code || ''
-    }));
-  };
-
-  const handleProjectChange = (event: SelectChangeEvent<any>) => {
-    const projectId = parseInt(event.target.value as string, 10);
-    const project = projects.find(p => p.id === projectId);
-    setEmployee(prev => ({
-      ...prev,
-      projectId: projectId,
-      projectCode: project?.code || ''
-    }));
-  };
 
   const handleQualificationChange = (event: SelectChangeEvent<number[]>) => {
     const value = event.target.value as number[];
@@ -375,11 +357,14 @@ const EmployeeForm: React.FC = () => {
     console.log('📎 Current documentTypeId:', documentTypeId);
     if (file) {
       // Get selected document type to validate against its allowed extensions and size
-      // Use == to handle potential string/number mismatch from Select value
-      const selectedDocType = documentTypes.find(dt => dt.id == documentTypeId);
+      // Compare as strings to handle potential string/number mismatch from Select value safely
+      const selectedDocType = documentTypes.find(dt => String(dt.id) === String(documentTypeId));
       if (!selectedDocType) {
         console.log('❌ No document type selected!');
-        setUploadError('Please select a document type first');
+        const errorMsg = 'Please select a document type first';
+        window.alert(errorMsg);
+        setUploadError(errorMsg);
+        event.target.value = '';
         return;
       }
 
@@ -390,7 +375,12 @@ const EmployeeForm: React.FC = () => {
       const fileExtension = file.name.split('.').pop()?.toLowerCase();
 
       if (!fileExtension || !allowedExtensions.includes(fileExtension)) {
-        setUploadError(`Invalid file type. Allowed formats: ${allowedExtensions.join(', ').toUpperCase()}`);
+        const errorMsg = `Invalid file type. Allowed formats: ${allowedExtensions.join(', ').toUpperCase()}`;
+        window.alert(errorMsg);
+        setUploadError(errorMsg);
+        event.target.value = '';
+        setSelectedFile(null);
+        setFilePreview(null);
         return;
       }
 
@@ -398,7 +388,12 @@ const EmployeeForm: React.FC = () => {
       const maxSizeMB = selectedDocType.maxFileSizeMb || 5;
       const maxSizeBytes = maxSizeMB * 1024 * 1024;
       if (file.size > maxSizeBytes) {
-        setUploadError(`File size should be less than ${maxSizeMB}MB`);
+        const errorMsg = `File size should be less than ${maxSizeMB}MB`;
+        window.alert(errorMsg);
+        setUploadError(errorMsg);
+        event.target.value = '';
+        setSelectedFile(null);
+        setFilePreview(null);
         return;
       }
 
@@ -464,23 +459,29 @@ const EmployeeForm: React.FC = () => {
 
     if (!selectedFile || !documentTypeId) {
       console.log('❌ Validation failed: missing file or document type');
-      setUploadError('Please select a file and document type');
+      const errorMsg = 'Please select a file and document type';
+      window.alert(errorMsg);
+      setUploadError(errorMsg);
       return;
     }
 
     // Get document type name
-    // Use == to handle potential string/number mismatch from Select value
-    const docType = documentTypes.find(dt => dt.id == documentTypeId);
+    // Compare as strings to handle potential string/number mismatch from Select value safely
+    const docType = documentTypes.find(dt => String(dt.id) === String(documentTypeId));
     if (!docType) {
-      setUploadError('Invalid document type selected');
+      const errorMsg = 'Invalid document type selected';
+      window.alert(errorMsg);
+      setUploadError(errorMsg);
       return;
     }
 
     // Check if this document type is already staged
-    // Use == to handle potential string/number mismatch from Select value
-    const existingDoc = stagedDocuments.find(doc => doc.documentTypeId == documentTypeId);
+    // Compare as strings to handle potential string/number mismatch from Select value safely
+    const existingDoc = stagedDocuments.find(doc => String(doc.documentTypeId) === String(documentTypeId));
     if (existingDoc) {
-      setUploadError(`A document of type "${docType.name}" is already added. Please remove it first if you want to replace it.`);
+      const errorMsg = `A document of type "${docType.name}" is already added. Please remove it first if you want to replace it.`;
+      window.alert(errorMsg);
+      setUploadError(errorMsg);
       return;
     }
 
@@ -519,13 +520,37 @@ const EmployeeForm: React.FC = () => {
 
     if (!selectedFile || !documentTypeId) {
       console.log('❌ Validation failed: missing file or document type');
-      setUploadError('Please select a file and document type');
+      const errorMsg = 'Please select a file and document type';
+      window.alert(errorMsg);
+      setUploadError(errorMsg);
       return;
     }
 
     if (!id) {
       console.log('❌ Validation failed: no employee ID');
-      setUploadError('Please save the employee first before uploading documents');
+      const errorMsg = 'Please save the employee first before uploading documents';
+      window.alert(errorMsg);
+      setUploadError(errorMsg);
+      return;
+    }
+
+    // Get document type name
+    // Compare as strings to handle potential string/number mismatch from Select value safely
+    const docType = documentTypes.find(dt => String(dt.id) === String(documentTypeId));
+    if (!docType) {
+      const errorMsg = 'Invalid document type selected';
+      window.alert(errorMsg);
+      setUploadError(errorMsg);
+      return;
+    }
+
+    // Check if this document type is already uploaded
+    // Compare as strings to handle potential string/number mismatch from Select value safely
+    const existingDoc = uploadedDocuments.find(doc => String(doc.documentTypeId) === String(documentTypeId));
+    if (existingDoc) {
+      const errorMsg = `A document of type "${docType.name}" is already uploaded for this employee. Please delete the existing one first if you want to replace it.`;
+      window.alert(errorMsg);
+      setUploadError(errorMsg);
       return;
     }
 
@@ -565,11 +590,14 @@ const EmployeeForm: React.FC = () => {
         await loadEmployeeDocuments(parseInt(id));
       } else {
         console.log('❌ Upload failed:', response.message);
+        window.alert(response.message || 'Upload failed');
         setUploadError(response.message || 'Upload failed');
       }
     } catch (error: any) {
       console.error('❌ Upload error:', error);
-      setUploadError(error?.response?.data?.message || 'Upload failed');
+      const errMsg = error?.response?.data?.message || 'Upload failed';
+      window.alert(errMsg);
+      setUploadError(errMsg);
     } finally {
       setUploading(false);
       console.log('🔵 Upload process completed');
@@ -1326,44 +1354,40 @@ const EmployeeForm: React.FC = () => {
                 </FormControl>
               </Grid>
               <Grid item xs={12} md={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Customer</InputLabel>
-                  <Select
-                    value={employee.customerId ?? ''}
-                    label="Customer"
-                    onChange={handleCustomerChange}
-                    disabled={masterDataLoading}
-                    displayEmpty
-                    renderValue={(selected: any) => {
-                      if (!selected || selected === '' || selected === null || selected === undefined || selected === 0) {
-                        return <span style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '0.875rem' }}>Select Customer</span>;
-                      }
-                      const customer = customers.find(c => c.id === selected);
-                      return customer?.name || String(selected);
-                    }}
-                    sx={{
-                      '& .MuiSelect-select': {
-                        paddingLeft: '20px !important',
-                        paddingRight: '40px !important',
-                        paddingTop: '14px !important',
-                        paddingBottom: '14px !important',
-                        overflow: 'visible !important',
-                        textOverflow: 'clip !important',
-                        whiteSpace: 'nowrap !important',
-                        '@media (max-width:600px)': {
-                          paddingLeft: '16px !important',
-                          paddingRight: '32px !important',
-                          paddingTop: '10px !important',
-                          paddingBottom: '10px !important',
-                        },
-                      },
-                    }}
-                  >
-                    {customers.filter(c => (c.isActive || c.id === employee.customerId)).map((customer) => (
-                      <MenuItem key={customer.id} value={customer.id}>{customer.name}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                <Autocomplete
+                  options={customers}
+                  getOptionLabel={(option) => typeof option === 'string' ? option : (option?.name || '')}
+                  isOptionEqualToValue={(option, value) => String(option.id) === String(value.id)}
+                  value={customers.find(c => String(c.id) === String(employee.customerId)) || null}
+                  onChange={(event, newValue) => {
+                    const customerId = newValue ? newValue.id : 0;
+                    const customerCode = newValue ? newValue.code : '';
+                    setEmployee(prev => ({
+                      ...prev,
+                      customerId: customerId,
+                      customerCode: customerCode ? String(customerCode) : ''
+                    }));
+                  }}
+                  disabled={masterDataLoading}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      paddingTop: '9px !important',
+                      paddingBottom: '9px !important',
+                      paddingLeft: '12px !important',
+                      minHeight: '53px',
+                    },
+                    '& .MuiAutocomplete-input': {
+                      padding: '4px 4px !important',
+                    }
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Customer"
+                      placeholder="Select Customer"
+                    />
+                  )}
+                />
               </Grid>
               <Grid item xs={12} md={6}>
                 <TextField
@@ -1375,44 +1399,40 @@ const EmployeeForm: React.FC = () => {
                 />
               </Grid>
               <Grid item xs={12} md={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Project</InputLabel>
-                  <Select
-                    value={employee.projectId ?? ''}
-                    label="Project"
-                    onChange={handleProjectChange}
-                    disabled={masterDataLoading}
-                    displayEmpty
-                    renderValue={(selected: any) => {
-                      if (!selected || selected === '' || selected === null || selected === undefined || selected === 0) {
-                        return <span style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '0.875rem' }}>Select Project</span>;
-                      }
-                      const project = projects.find(p => p.id === selected);
-                      return project?.name || String(selected);
-                    }}
-                    sx={{
-                      '& .MuiSelect-select': {
-                        paddingLeft: '20px !important',
-                        paddingRight: '40px !important',
-                        paddingTop: '14px !important',
-                        paddingBottom: '14px !important',
-                        overflow: 'visible !important',
-                        textOverflow: 'clip !important',
-                        whiteSpace: 'nowrap !important',
-                        '@media (max-width:600px)': {
-                          paddingLeft: '16px !important',
-                          paddingRight: '32px !important',
-                          paddingTop: '10px !important',
-                          paddingBottom: '10px !important',
-                        },
-                      },
-                    }}
-                  >
-                    {projects.filter(p => (p.isActive || p.id === employee.projectId)).map((project) => (
-                      <MenuItem key={project.id} value={project.id}>{project.name}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                <Autocomplete
+                  options={projects}
+                  getOptionLabel={(option) => typeof option === 'string' ? option : (option?.name || '')}
+                  isOptionEqualToValue={(option, value) => String(option.id) === String(value.id)}
+                  value={projects.find(p => String(p.id) === String(employee.projectId)) || null}
+                  onChange={(event, newValue) => {
+                    const projectId = newValue ? newValue.id : 0;
+                    const projectCode = newValue ? newValue.code : '';
+                    setEmployee(prev => ({
+                      ...prev,
+                      projectId: projectId,
+                      projectCode: projectCode ? String(projectCode) : ''
+                    }));
+                  }}
+                  disabled={masterDataLoading}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      paddingTop: '9px !important',
+                      paddingBottom: '9px !important',
+                      paddingLeft: '12px !important',
+                      minHeight: '53px',
+                    },
+                    '& .MuiAutocomplete-input': {
+                      padding: '4px 4px !important',
+                    }
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Project"
+                      placeholder="Select Project"
+                    />
+                  )}
+                />
               </Grid>
               <Grid item xs={12} md={6}>
                 <TextField

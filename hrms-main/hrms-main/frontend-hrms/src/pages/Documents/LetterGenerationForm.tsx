@@ -639,7 +639,7 @@ const LetterGenerationForm: React.FC = () => {
               )}
 
               {/* Candidate Info & Date Row (Aligning Mr./Ms. and Date on the same horizontal line) */}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 5.5 }}>
                 {/* Left Side: Candidate Name & Address */}
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.2, maxWidth: '65%' }}>
                   <Typography sx={{ fontSize: '12.5pt', fontFamily: 'inherit', fontWeight: 'bold' }}>
@@ -659,7 +659,7 @@ const LetterGenerationForm: React.FC = () => {
               </Box>
 
               {/* Subject Line */}
-              <Box sx={{ textAlign: 'center', mb: 3.5 }}>
+              <Box sx={{ textAlign: 'center', mb: 5.5 }}>
                 <Typography sx={{ fontSize: '13.5pt', fontFamily: 'inherit', fontWeight: 'bold', textDecoration: 'underline' }}>
                   Subject: Offer Letter
                 </Typography>

@@ -58,10 +58,9 @@ const generateCustomerCode = async (): Promise<string> => {
 export const getAllCustomers = async (req: Request, res: Response) => {
     try {
         const [rows] = await db.query<RowDataPacket[]>(
-            'SELECT * FROM hrms_customers ORDER BY name'
+            'SELECT CustomerID as id, MasterCustomerName as name, CAST(CustomerID AS CHAR) as code, 1 as isActive FROM customer GROUP BY CustomerID, MasterCustomerName ORDER BY MasterCustomerName'
         );
-        const camelCaseRows = convertRowsToCamelCase(rows);
-        res.json({ success: true, message: 'Customers retrieved successfully', data: camelCaseRows });
+        res.json({ success: true, message: 'Customers retrieved successfully', data: rows });
     } catch (error: any) {
         console.error('Error fetching customers:', error);
         res.status(500).json({ success: false, message: 'Failed to fetch customers', error: error.message });
@@ -73,7 +72,7 @@ export const getCustomerById = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const [rows] = await db.query<RowDataPacket[]>(
-            'SELECT * FROM hrms_customers WHERE id = ?',
+            'SELECT CustomerID as id, MasterCustomerName as name, CAST(CustomerID AS CHAR) as code, 1 as isActive FROM customer WHERE CustomerID = ?',
             [id]
         );
 
@@ -81,8 +80,7 @@ export const getCustomerById = async (req: Request, res: Response) => {
             return res.status(404).json({ success: false, message: 'Customer not found' });
         }
 
-        const camelCaseRow = convertRowToCamelCase(rows[0]);
-        res.json({ success: true, message: 'Customer retrieved successfully', data: camelCaseRow });
+        res.json({ success: true, message: 'Customer retrieved successfully', data: rows[0] });
     } catch (error: any) {
         console.error('Error fetching customer:', error);
         res.status(500).json({ success: false, message: 'Failed to fetch customer', error: error.message });

@@ -100,16 +100,16 @@ export const getAllEmployees = async (req: Request, res: Response) => {
         e.*,
         d.name as department_name,
         des.name as designation_name,
-        c.name as customer_name,
-        c.code as customer_code,
-        p.name as project_name,
-        p.code as project_code,
+        c.MasterCustomerName as customer_name,
+        c.CustomerID as customer_code,
+        p.ProjectName as project_name,
+        p.ProjectID as project_code,
         (SELECT monthly_ctc FROM hrms_offer_letters WHERE employee_id = e.id ORDER BY created_at DESC LIMIT 1) as salary
       FROM hrms_employees e
       LEFT JOIN hrms_departments d ON e.department_id = d.id
       LEFT JOIN hrms_designations des ON e.designation_id = des.id
-      LEFT JOIN hrms_customers c ON e.customer_id = c.id
-      LEFT JOIN hrms_projects p ON e.project_id = p.id
+      LEFT JOIN customer c ON e.customer_id = c.CustomerID
+      LEFT JOIN project p ON e.project_id = p.ProjectID
     `;
 
     let countQuery = `SELECT COUNT(*) as total FROM hrms_employees e`;
@@ -166,12 +166,12 @@ export const getEmployeeById = async (req: Request, res: Response) => {
     const [rows]: any = await pool.query(`
       SELECT
         e.*,
-        c.code as customer_code,
-        p.code as project_code,
+        c.CustomerID as customer_code,
+        p.ProjectID as project_code,
         (SELECT monthly_ctc FROM hrms_offer_letters WHERE employee_id = e.id ORDER BY created_at DESC LIMIT 1) as salary
       FROM hrms_employees e
-      LEFT JOIN hrms_customers c ON e.customer_id = c.id
-      LEFT JOIN hrms_projects p ON e.project_id = p.id
+      LEFT JOIN customer c ON e.customer_id = c.CustomerID
+      LEFT JOIN project p ON e.project_id = p.ProjectID
       WHERE e.id = ?
     `, [id]);
     if (rows.length === 0) {
@@ -498,6 +498,17 @@ export const uploadEmployeeDocument = async (req: Request, res: Response) => {
   }
 
   try {
+    // Check if duplicate document type exists
+    const [existingDocs]: any = await pool.query(
+      'SELECT id FROM hrms_employee_documents WHERE employee_id = ? AND document_type_id = ?',
+      [employeeId, documentTypeId]
+    );
+
+    if (existingDocs.length > 0) {
+      console.log('❌ Upload failed - duplicate document type');
+      return res.status(400).json({ success: false, message: 'A document of this type already exists for this employee.' });
+    }
+
     const { uploadBufferToBlob, getBlobUrl } = require('../services/azureBlobService');
 
     // Upload to Azure blob storage in "documents" folder

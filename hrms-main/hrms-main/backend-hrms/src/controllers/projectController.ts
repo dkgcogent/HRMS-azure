@@ -58,10 +58,9 @@ const generateProjectCode = async (): Promise<string> => {
 export const getAllProjects = async (req: Request, res: Response) => {
     try {
         const [rows] = await db.query<RowDataPacket[]>(
-            'SELECT * FROM hrms_projects ORDER BY name'
+            "SELECT ProjectID as id, ProjectName as name, CAST(ProjectID AS CHAR) as code, 1 as isActive FROM project GROUP BY ProjectID, ProjectName ORDER BY ProjectName"
         );
-        const camelCaseRows = convertRowsToCamelCase(rows);
-        res.json({ success: true, message: 'Projects retrieved successfully', data: camelCaseRows });
+        res.json({ success: true, message: 'Projects retrieved successfully', data: rows });
     } catch (error: any) {
         console.error('Error fetching projects:', error);
         res.status(500).json({ success: false, message: 'Failed to fetch projects', error: error.message });
@@ -73,7 +72,7 @@ export const getProjectById = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const [rows] = await db.query<RowDataPacket[]>(
-            'SELECT * FROM hrms_projects WHERE id = ?',
+            "SELECT ProjectID as id, ProjectName as name, CAST(ProjectID AS CHAR) as code, 1 as isActive FROM project WHERE ProjectID = ?",
             [id]
         );
 
@@ -81,8 +80,7 @@ export const getProjectById = async (req: Request, res: Response) => {
             return res.status(404).json({ success: false, message: 'Project not found' });
         }
 
-        const camelCaseRow = convertRowToCamelCase(rows[0]);
-        res.json({ success: true, message: 'Project retrieved successfully', data: camelCaseRow });
+        res.json({ success: true, message: 'Project retrieved successfully', data: rows[0] });
     } catch (error: any) {
         console.error('Error fetching project:', error);
         res.status(500).json({ success: false, message: 'Failed to fetch project', error: error.message });
