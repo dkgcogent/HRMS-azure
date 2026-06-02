@@ -1055,7 +1055,7 @@ const LetterGenerationForm: React.FC = () => {
                 </Typography>
               </Box>
 
-              <Divider sx={{ my: 3, opacity: 0.5 }} />
+              <Divider sx={{ my: 1.5, opacity: 0.5 }} />
 
               {/* Checklist Section */}
               <Box sx={{ mb: 1 }}>
@@ -1065,7 +1065,7 @@ const LetterGenerationForm: React.FC = () => {
               </Box>
 
               {/* Single-Column Professional Checklist Layout */}
-              <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', gap: 0.7 }}>
+              <Box sx={{ mb: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                 {checklistItems.map((item, idx) => (
                   <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.2 }}>
                     <Typography sx={{ fontWeight: 'bold', fontSize: '10.5pt', minWidth: '15px' }}>{idx + 1}.</Typography>
@@ -1075,14 +1075,14 @@ const LetterGenerationForm: React.FC = () => {
               </Box>
 
               {/* Closing note */}
-              <Box sx={{ mb: 3 }}>
+              <Box sx={{ mb: 1 }}>
                 <Typography sx={{ fontSize: '11.5pt', fontFamily: 'inherit', fontStyle: 'italic', color: '#444' }}>
                   We are sure that you will have a beneficial and long-term association with us. Congratulations and best of Luck!
                 </Typography>
               </Box>
 
               {/* Regards bottom layout block */}
-              <Box sx={{ mt: 'auto', display: 'flex', justifyContent: 'flex-start', pb: 0.5 }}>
+              <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-start', pb: 0.5 }}>
                 {/* Regards & Company Sign block */}
                 <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                   <Typography sx={{ fontSize: '11.5pt', fontFamily: 'inherit' }}>Regards,</Typography>
