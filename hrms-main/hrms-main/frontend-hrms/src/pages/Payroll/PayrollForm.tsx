@@ -16,13 +16,16 @@ import {
   Divider,
   Alert,
   Snackbar,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import {
   Save as SaveIcon,
   Cancel as CancelIcon,
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
-import { apiService } from '../../services/api';
+import { apiService, API_BASE_URL } from '../../services/api';
+import axios from 'axios';
 
 interface PayrollRecord {
   id?: number;
@@ -33,15 +36,16 @@ interface PayrollRecord {
   basicSalary: number;
   allowances: {
     hra: number;
-    transport: number;
-    medical: number;
-    other: number;
+    transport: number;     // represents Performance Bonus Earned
+    medical: number;       // represents Leave Encashment Earned
+    other: number;         // represents Other Allowances Earned
+    advanceBonus: number;  // represents Advance Bonus Earned
   };
   deductions: {
     pf: number;
     esi: number;
-    tax: number;
-    other: number;
+    tax: number;           // represents Professional Tax
+    other: number;         // represents Labor Welfare Fund (Self)
   };
   grossSalary: number;
   totalDeductions: number;
@@ -52,12 +56,44 @@ interface PayrollRecord {
   calculationBasis: 'New Government Rule' | 'Old Basis';
   esicCovered: 'Yes' | 'No';
   baseGrossSalary: number;
+
+  // Base excel components (White cells)
+  baseBasic: number;
+  baseHra: number;
+  baseOther: number;
+  baseBonus: number;
+  baseLeave: number;
+  baseAdvance: number;
+  pTax: number;
+  lwfSelf: number;
+  lwfCompany: number;
+  usePfCap: boolean;
+
+  // Employer contributions (Section III)
+  emrPf: number;
+  emrEsic: number;
+  emrGratuity: number;
+  emrLwf: number;
+  companyAdditionalCost: number;
+  totalCtc: number;
 }
 
 const PayrollForm: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEdit = Boolean(id);
+
+  const calculatedFieldSx = {
+    '& .MuiFilledInput-root': {
+      backgroundColor: '#fffde7',
+      '&:hover': {
+        backgroundColor: '#fff9c4',
+      },
+      '&.Mui-focused': {
+        backgroundColor: '#fff9c4',
+      }
+    }
+  };
 
   const [loading, setLoading] = useState(false);
   const [employees, setEmployees] = useState<any[]>([]);
@@ -77,6 +113,7 @@ const PayrollForm: React.FC = () => {
       transport: 0,
       medical: 0,
       other: 0,
+      advanceBonus: 0,
     },
     deductions: {
       pf: 0,
@@ -87,12 +124,32 @@ const PayrollForm: React.FC = () => {
     grossSalary: 0,
     totalDeductions: 0,
     netSalary: 0,
-    workingDays: 22,
-    presentDays: 22,
+    workingDays: 27,
+    presentDays: 27,
     status: 'DRAFT',
     calculationBasis: 'Old Basis',
     esicCovered: 'No',
-    baseGrossSalary: 0,
+    baseGrossSalary: 29057,
+
+    // Base salary break-up calculator inputs (White cells)
+    baseBasic: 0,
+    baseHra: 0,
+    baseOther: 0,
+    baseBonus: 0,
+    baseLeave: 0,
+    baseAdvance: 0,
+    pTax: 0,
+    lwfSelf: 0,
+    lwfCompany: 0,
+    usePfCap: false,
+
+    // Employer calculations (Section III)
+    emrPf: 0,
+    emrEsic: 0,
+    emrGratuity: 0,
+    emrLwf: 0,
+    companyAdditionalCost: 0,
+    totalCtc: 0,
   });
 
   useEffect(() => {
@@ -105,7 +162,21 @@ const PayrollForm: React.FC = () => {
   useEffect(() => {
     calculateSalary();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [payroll.baseGrossSalary, payroll.calculationBasis, payroll.esicCovered, payroll.workingDays, payroll.presentDays]);
+  }, [
+    payroll.workingDays,
+    payroll.presentDays,
+    payroll.esicCovered,
+    payroll.usePfCap,
+    payroll.baseBasic,
+    payroll.baseHra,
+    payroll.baseOther,
+    payroll.baseBonus,
+    payroll.baseLeave,
+    payroll.baseAdvance,
+    payroll.pTax,
+    payroll.lwfSelf,
+    payroll.lwfCompany
+  ]);
 
   const loadEmployees = async () => {
     try {
@@ -148,42 +219,55 @@ const PayrollForm: React.FC = () => {
   };
 
   const calculateSalary = () => {
-    const gross = payroll.baseGrossSalary || 0;
-
-    let basic = 0;
-    let hra = 0;
-    let other = 0;
-    let bonus = 0;
-
-    if (payroll.calculationBasis === 'Old Basis') {
-      basic = Math.round(gross / 2.0833);
-      hra = Math.round(basic * 0.5);
-      bonus = Math.round(basic * 0.0833 * 10) / 10;
-      other = Math.max(0, gross - (basic + hra + bonus));
-    } else {
-      basic = Math.round(gross * 0.57242);
-      hra = Math.round(basic * 0.5);
-      bonus = Math.round(basic * 0.0833 * 10) / 10;
-      other = Math.max(0, gross - (basic + hra + bonus));
-    }
-
     const ratio = payroll.workingDays > 0 ? (payroll.presentDays / payroll.workingDays) : 0;
 
-    // Pro-rate based on attendance
-    const proBasic = Math.round(basic * ratio);
-    const proHra = Math.round(hra * ratio);
-    const proBonus = Math.round(bonus * ratio);
-    const proOther = Math.round(other * ratio);
-    const proGross = proBasic + proHra + proBonus + proOther;
+    const baseBasic = Number(payroll.baseBasic) || 0;
+    const baseHra = Number(payroll.baseHra) || 0;
+    const baseOther = Number(payroll.baseOther) || 0;
+    const baseBonus = Number(payroll.baseBonus) || 0;
+    const baseLeave = Number(payroll.baseLeave) || 0;
+    const baseAdvance = Number(payroll.baseAdvance) || 0;
+    const pTax = Number(payroll.pTax) || 0;
+    const lwfSelf = Number(payroll.lwfSelf) || 0;
+    const lwfCompany = Number(payroll.lwfCompany) || 0;
 
-    // Deductions
-    const emyPF = Math.round(proBasic * 0.12);
-    const emyESIC = payroll.esicCovered === 'Yes' && gross <= 21000 ? Math.ceil(proGross * 0.0075) : 0;
-    const pTax = gross > 15000 ? 200 : 0;
-    const lwfEmployee = payroll.esicCovered === 'Yes' ? 10 : 0;
+    // Pro-rate based on attendance (Requirement 4)
+    const proBasic = Math.round(baseBasic * ratio);
+    const proHra = Math.round(baseHra * ratio);
+    const proOther = Math.round(baseOther * ratio);
+    const proBonus = Math.round(baseBonus * ratio);
+    const proLeave = Math.round(baseLeave * ratio);
+    const proAdvance = Math.round(baseAdvance * ratio);
+    const proGross = proBasic + proHra + proOther + proBonus + proLeave + proAdvance;
 
-    const totalDeductions = emyPF + emyESIC + pTax + lwfEmployee;
+    // Employee Deductions (Section II)
+    // PF Capped logic: If Basic Earned > 15000: PF = 1800. Else 12% (Requirement 5)
+    let emyPF = 0;
+    if (payroll.usePfCap) {
+      emyPF = proBasic > 15000 ? 1800 : Math.round(proBasic * 0.12);
+    } else {
+      emyPF = Math.round(proBasic * 0.12);
+    }
+
+    // ESI Capped logic: If ESIC enabled AND Gross Salary < 21001 (Requirement 6)
+    const emyESIC = (payroll.esicCovered === 'Yes' && proGross < 21001) ? Math.round(proGross * 0.0075) : 0;
+
+    const totalDeductions = emyPF + emyESIC + pTax + lwfSelf;
     const netSalary = Math.round(proGross - totalDeductions);
+
+    // Employer Contributions (Section III / Requirement 10)
+    let emrPF = 0;
+    if (payroll.usePfCap) {
+      emrPF = proBasic > 15000 ? 1950 : Math.round(proBasic * 0.13); // includes Employer PF (12%) and PF Admin (1%)
+    } else {
+      emrPF = Math.round(proBasic * 0.13);
+    }
+
+    const emrESIC = (payroll.esicCovered === 'Yes' && proGross < 21001) ? Math.round(proGross * 0.0325) : 0;
+    const gratuity = Math.round(proBasic * 15 / 26 / 12); // Requirement 7
+
+    const companyAdditionalCost = emrPF + emrESIC + gratuity + lwfCompany;
+    const totalCtc = proGross + companyAdditionalCost;
 
     setPayroll(prev => ({
       ...prev,
@@ -191,18 +275,25 @@ const PayrollForm: React.FC = () => {
       allowances: {
         hra: proHra,
         transport: proBonus,
-        medical: 0,
+        medical: proLeave,
         other: proOther,
+        advanceBonus: proAdvance,
       },
       deductions: {
         pf: emyPF,
         esi: emyESIC,
         tax: pTax,
-        other: lwfEmployee,
+        other: lwfSelf,
       },
       grossSalary: proGross,
       totalDeductions: totalDeductions,
       netSalary: netSalary,
+      emrPf: emrPF,
+      emrEsic: emrESIC,
+      emrGratuity: gratuity,
+      emrLwf: lwfCompany,
+      companyAdditionalCost,
+      totalCtc,
     }));
   };
 
@@ -231,19 +322,70 @@ const PayrollForm: React.FC = () => {
   const handleEmployeeChange = async (employeeId: number) => {
     setPayroll(prev => ({ ...prev, employeeId }));
 
-    // Auto-load employee salary details if available
     try {
-      // In real app: const salaryDetails = await apiService.getEmployeeSalary(employeeId);
-      // For now, set default values
-      setPayroll(prev => ({
-        ...prev,
-        baseGrossSalary: 50000,
-        calculationBasis: 'Old Basis',
-        esicCovered: 'No'
-      }));
+      // Query the employee's offer letters
+      const response = await axios.get(`${API_BASE_URL}/api/offer-letters/my-letters/${employeeId}`);
+      if (response.data.success && response.data.data && response.data.data.length > 0) {
+        // Take the latest offer letter
+        const latestLetter = response.data.data[0];
+        
+        // Fetch full letter details to get offer_data
+        const detailsResponse = await axios.get(`${API_BASE_URL}/api/offer-letters/${latestLetter.id}`);
+        if (detailsResponse.data.success && detailsResponse.data.data) {
+          const letterDetails = detailsResponse.data.data;
+          // Parse offer_data
+          const offerData = typeof letterDetails.offer_data === 'string' 
+            ? JSON.parse(letterDetails.offer_data) 
+            : letterDetails.offer_data;
+          
+          if (offerData) {
+            setPayroll(prev => ({
+              ...prev,
+              baseGrossSalary: Number(offerData.grossSalary) || 0,
+              baseBasic: Number(offerData.basicSalary) || 0,
+              baseHra: Number(offerData.hra) || 0,
+              baseOther: Number(offerData.otherAllowances) || 0,
+              baseBonus: Number(offerData.performanceBonus) || 0,
+              baseLeave: Number(offerData.leaveEncashment) || 0,
+              baseAdvance: Number(offerData.advanceBonus) || 0,
+              pTax: Number(offerData.pTax) || 0,
+              lwfSelf: Number(offerData.lwfEmployee) || 0,
+              lwfCompany: Number(offerData.lwfEmployer) || 0,
+              usePfCap: offerData.usePfCap || false,
+              esicCovered: offerData.esicCovered || 'No',
+              calculationBasis: offerData.calculationBasis || 'Old Basis'
+            }));
+            
+            setSnackbar({
+              open: true,
+              message: `Loaded salary structure from employee's latest Offer Letter!`,
+              severity: 'success'
+            });
+            return;
+          }
+        }
+      }
     } catch (error) {
-      console.error('Error loading employee salary:', error);
+      console.warn('Error loading employee salary structure from Offer Letter:', error);
     }
+
+    // Fallback default values
+    setPayroll(prev => ({
+      ...prev,
+      baseGrossSalary: 29057,
+      baseBasic: 16868,
+      baseHra: 8434,
+      baseOther: 3755,
+      baseBonus: 0,
+      baseLeave: 0,
+      baseAdvance: 0,
+      pTax: 0,
+      lwfSelf: 0,
+      lwfCompany: 0,
+      usePfCap: false,
+      esicCovered: 'No',
+      calculationBasis: 'Old Basis'
+    }));
   };
 
   const validateForm = () => {
@@ -488,41 +630,129 @@ const PayrollForm: React.FC = () => {
               />
             </Grid>
 
-            {/* Salary Information */}
+            {/* Salary Information Inputs */}
             <Grid size={12}>
-              <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-                Salary Information
+              <Typography variant="h6" gutterBottom sx={{ mt: 2, color: 'primary.main', fontWeight: 'bold' }}>
+                Base Salary Breakup Structure (Excel Monthly Calculator)
               </Typography>
-              <Alert severity="info" sx={{ mb: 2 }}>
-                Salary components are auto-calculated based on Calculation Basis and Base Monthly Gross Salary.
+              <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
+                Enter the monthly base components below (white cells). They will be automatically pro-rated based on the employee's attendance. Selecting an employee will attempt to auto-load these values from their latest Offer Letter.
               </Alert>
             </Grid>
 
-            <Grid
-              size={{
-                xs: 12,
-                md: 4
-              }}>
-              <FormControl fullWidth>
-                <InputLabel id="payroll-calc-basis-label" shrink>Calculation Basis</InputLabel>
-                <Select
-                  labelId="payroll-calc-basis-label"
-                  value={payroll.calculationBasis}
-                  label="Calculation Basis"
-                  onChange={(e) => handleInputChange('calculationBasis', e.target.value)}
-                >
-                  <MenuItem value="Old Basis">Old Basis</MenuItem>
-                  <MenuItem value="New Government Rule">New Government Rule</MenuItem>
-                </Select>
-              </FormControl>
+            {/* Base Basic */}
+            <Grid size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                label="Base Basic Salary"
+                type="number"
+                required
+                value={payroll.baseBasic || ''}
+                onChange={(e) => handleInputChange('baseBasic', parseFloat(e.target.value) || 0)}
+                InputProps={{ startAdornment: '₹' }}
+              />
             </Grid>
 
-            <Grid
-              size={{
-                xs: 12,
-                md: 4
-              }}>
-              <FormControl fullWidth>
+            {/* Base HRA */}
+            <Grid size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                label="Base HRA"
+                type="number"
+                required
+                value={payroll.baseHra || ''}
+                onChange={(e) => handleInputChange('baseHra', parseFloat(e.target.value) || 0)}
+                InputProps={{ startAdornment: '₹' }}
+              />
+            </Grid>
+
+            {/* Base Other Allowances */}
+            <Grid size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                label="Base Other Allowances"
+                type="number"
+                value={payroll.baseOther || ''}
+                onChange={(e) => handleInputChange('baseOther', parseFloat(e.target.value) || 0)}
+                InputProps={{ startAdornment: '₹' }}
+              />
+            </Grid>
+
+            {/* Base Performance Bonus */}
+            <Grid size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                label="Base Performance Bonus"
+                type="number"
+                value={payroll.baseBonus || ''}
+                onChange={(e) => handleInputChange('baseBonus', parseFloat(e.target.value) || 0)}
+                InputProps={{ startAdornment: '₹' }}
+              />
+            </Grid>
+
+            {/* Base Leave Encashment */}
+            <Grid size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                label="Base Leave Encashment"
+                type="number"
+                value={payroll.baseLeave || ''}
+                onChange={(e) => handleInputChange('baseLeave', parseFloat(e.target.value) || 0)}
+                InputProps={{ startAdornment: '₹' }}
+              />
+            </Grid>
+
+            {/* Base Advance Bonus */}
+            <Grid size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                label="Base Advance Bonus"
+                type="number"
+                value={payroll.baseAdvance || ''}
+                onChange={(e) => handleInputChange('baseAdvance', parseFloat(e.target.value) || 0)}
+                InputProps={{ startAdornment: '₹' }}
+              />
+            </Grid>
+
+            {/* Professional Tax */}
+            <Grid size={{ xs: 12, md: 3 }}>
+              <TextField
+                fullWidth
+                label="Professional Tax"
+                type="number"
+                value={payroll.pTax || ''}
+                onChange={(e) => handleInputChange('pTax', parseFloat(e.target.value) || 0)}
+                InputProps={{ startAdornment: '₹' }}
+              />
+            </Grid>
+
+            {/* LWF Self */}
+            <Grid size={{ xs: 12, md: 3 }}>
+              <TextField
+                fullWidth
+                label="LWF (Self Contribution)"
+                type="number"
+                value={payroll.lwfSelf || ''}
+                onChange={(e) => handleInputChange('lwfSelf', parseFloat(e.target.value) || 0)}
+                InputProps={{ startAdornment: '₹' }}
+              />
+            </Grid>
+
+            {/* LWF Company */}
+            <Grid size={{ xs: 12, md: 3 }}>
+              <TextField
+                fullWidth
+                label="LWF (Company Contribution)"
+                type="number"
+                value={payroll.lwfCompany || ''}
+                onChange={(e) => handleInputChange('lwfCompany', parseFloat(e.target.value) || 0)}
+                InputProps={{ startAdornment: '₹' }}
+              />
+            </Grid>
+
+            {/* ESIC Toggle and PF limit switches */}
+            <Grid size={{ xs: 12, md: 3 }} sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <FormControl fullWidth size="small" sx={{ mb: 1 }}>
                 <InputLabel id="payroll-esic-label" shrink>ESIC Covered</InputLabel>
                 <Select
                   labelId="payroll-esic-label"
@@ -534,211 +764,238 @@ const PayrollForm: React.FC = () => {
                   <MenuItem value="Yes">Yes</MenuItem>
                 </Select>
               </FormControl>
-            </Grid>
-
-            <Grid
-              size={{
-                xs: 12,
-                md: 4
-              }}>
-              <TextField
-                fullWidth
-                label="Base Monthly Gross Salary"
-                type="number"
-                required
-                value={payroll.baseGrossSalary}
-                onChange={(e) => handleInputChange('baseGrossSalary', e.target.value)}
-                InputProps={{ startAdornment: '₹' }}
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={payroll.usePfCap}
+                    onChange={(e) => handleInputChange('usePfCap', e.target.checked)}
+                    color="secondary"
+                    size="small"
+                  />
+                }
+                label={<Typography variant="caption" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Limit PF to 15,000 Basic (Cap)</Typography>}
               />
             </Grid>
 
             <Grid size={12}>
               <Divider sx={{ my: 1 }} />
-              <Typography variant="subtitle2" color="text.secondary">
-                Calculated Pro-Rated Components Based on Attendance
+              <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 'bold' }}>
+                Calculated Attendance-Based Earned Breakup (ratio = {payroll.presentDays} / {payroll.workingDays})
               </Typography>
             </Grid>
 
+            {/* Earnings output */}
             <Grid size={12}>
-              <Typography variant="h6" gutterBottom sx={{ mt: 1 }}>
-                Earnings
+              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                Earned Earnings (Pro-rated)
               </Typography>
             </Grid>
 
-            <Grid
-              size={{
-                xs: 12,
-                md: 6
-              }}>
+            {/* Earned Basic */}
+            <Grid size={{ xs: 12, md: 4 }}>
               <TextField
                 fullWidth
-                label="Basic Salary (Pro-rated)"
-                type="number"
-                value={payroll.basicSalary}
-                InputProps={{ startAdornment: '₹', readOnly: true }}
+                label="Earned Basic"
+                value={payroll.basicSalary || 0}
+                variant="filled"
+                sx={calculatedFieldSx}
+                InputProps={{ readOnly: true, startAdornment: '₹' }}
               />
             </Grid>
 
-            {/* Allowances */}
+            {/* Earned HRA */}
+            <Grid size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                label="Earned HRA"
+                value={payroll.allowances.hra || 0}
+                variant="filled"
+                sx={calculatedFieldSx}
+                InputProps={{ readOnly: true, startAdornment: '₹' }}
+              />
+            </Grid>
+
+            {/* Earned Other Allowances */}
+            <Grid size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                label="Earned Other Allowances"
+                value={payroll.allowances.other || 0}
+                variant="filled"
+                sx={calculatedFieldSx}
+                InputProps={{ readOnly: true, startAdornment: '₹' }}
+              />
+            </Grid>
+
+            {/* Earned Performance Bonus */}
+            <Grid size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                label="Earned Performance Bonus"
+                value={payroll.allowances.transport || 0}
+                variant="filled"
+                sx={calculatedFieldSx}
+                InputProps={{ readOnly: true, startAdornment: '₹' }}
+              />
+            </Grid>
+
+            {/* Earned Leave Encashment */}
+            <Grid size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                label="Earned Leave Encashment"
+                value={payroll.allowances.medical || 0}
+                variant="filled"
+                sx={calculatedFieldSx}
+                InputProps={{ readOnly: true, startAdornment: '₹' }}
+              />
+            </Grid>
+
+            {/* Earned Advance Bonus */}
+            <Grid size={{ xs: 12, md: 4 }}>
+              <TextField
+                fullWidth
+                label="Earned Advance Bonus"
+                value={payroll.allowances.advanceBonus || 0}
+                variant="filled"
+                sx={calculatedFieldSx}
+                InputProps={{ readOnly: true, startAdornment: '₹' }}
+              />
+            </Grid>
+
+            {/* Deductions output */}
             <Grid size={12}>
-              <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-                Allowances
+              <Typography variant="subtitle1" sx={{ mt: 1, fontWeight: 'bold', color: 'error.main' }}>
+                Deductions (Self Contribution)
               </Typography>
             </Grid>
 
-            <Grid
-              size={{
-                xs: 12,
-                md: 3
-              }}>
+            {/* PF Self */}
+            <Grid size={{ xs: 12, md: 3 }}>
               <TextField
                 fullWidth
-                label="HRA"
-                type="number"
-                value={payroll.allowances.hra}
-                InputProps={{ startAdornment: '₹', readOnly: true }}
+                label="P.F. Deduction (Self)"
+                value={payroll.deductions.pf || 0}
+                variant="filled"
+                sx={calculatedFieldSx}
+                InputProps={{ readOnly: true, startAdornment: '₹' }}
               />
             </Grid>
 
-            <Grid
-              size={{
-                xs: 12,
-                md: 3
-              }}>
+            {/* ESI Self */}
+            <Grid size={{ xs: 12, md: 3 }}>
               <TextField
                 fullWidth
-                label="Performance Bonus / Transport"
-                type="number"
-                value={payroll.allowances.transport}
-                InputProps={{ startAdornment: '₹', readOnly: true }}
+                label="ESI Deduction (Self)"
+                value={payroll.deductions.esi || 0}
+                variant="filled"
+                sx={calculatedFieldSx}
+                InputProps={{ readOnly: true, startAdornment: '₹' }}
               />
             </Grid>
 
-            <Grid
-              size={{
-                xs: 12,
-                md: 3
-              }}>
-              <TextField
-                fullWidth
-                label="Medical Allowance"
-                type="number"
-                value={payroll.allowances.medical}
-                InputProps={{ startAdornment: '₹', readOnly: true }}
-              />
-            </Grid>
-
-            <Grid
-              size={{
-                xs: 12,
-                md: 3
-              }}>
-              <TextField
-                fullWidth
-                label="Other Allowances"
-                type="number"
-                value={payroll.allowances.other}
-                InputProps={{ startAdornment: '₹', readOnly: true }}
-              />
-            </Grid>
-
-            {/* Deductions */}
-            <Grid size={12}>
-              <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-                Deductions
-              </Typography>
-            </Grid>
-
-            <Grid
-              size={{
-                xs: 12,
-                md: 3
-              }}>
-              <TextField
-                fullWidth
-                label="Provident Fund"
-                type="number"
-                value={payroll.deductions.pf}
-                InputProps={{ startAdornment: '₹', readOnly: true }}
-              />
-            </Grid>
-
-            <Grid
-              size={{
-                xs: 12,
-                md: 3
-              }}>
-              <TextField
-                fullWidth
-                label="ESI"
-                type="number"
-                value={payroll.deductions.esi}
-                InputProps={{ startAdornment: '₹', readOnly: true }}
-              />
-            </Grid>
-
-            <Grid
-              size={{
-                xs: 12,
-                md: 3
-              }}>
+            {/* PTax */}
+            <Grid size={{ xs: 12, md: 3 }}>
               <TextField
                 fullWidth
                 label="Professional Tax"
-                type="number"
-                value={payroll.deductions.tax}
-                InputProps={{ startAdornment: '₹', readOnly: true }}
+                value={payroll.deductions.tax || 0}
+                variant="filled"
+                sx={calculatedFieldSx}
+                InputProps={{ readOnly: true, startAdornment: '₹' }}
               />
             </Grid>
 
-            <Grid
-              size={{
-                xs: 12,
-                md: 3
-              }}>
+            {/* LWF Self */}
+            <Grid size={{ xs: 12, md: 3 }}>
               <TextField
                 fullWidth
-                label="Other Deductions (LWF)"
-                type="number"
-                value={payroll.deductions.other}
-                InputProps={{ startAdornment: '₹', readOnly: true }}
+                label="Labor Welfare Fund (Self)"
+                value={payroll.deductions.other || 0}
+                variant="filled"
+                sx={calculatedFieldSx}
+                InputProps={{ readOnly: true, startAdornment: '₹' }}
+              />
+            </Grid>
+
+            {/* Employer Contributions output */}
+            <Grid size={12}>
+              <Typography variant="subtitle1" sx={{ mt: 1, fontWeight: 'bold', color: 'success.main' }}>
+                Employer Contributions (Section III)
+              </Typography>
+            </Grid>
+
+            {/* Employer PF */}
+            <Grid size={{ xs: 12, md: 3 }}>
+              <TextField
+                fullWidth
+                label="Employer P.F. (13%)"
+                value={payroll.emrPf || 0}
+                variant="filled"
+                sx={calculatedFieldSx}
+                InputProps={{ readOnly: true, startAdornment: '₹' }}
+              />
+            </Grid>
+
+            {/* Employer ESI */}
+            <Grid size={{ xs: 12, md: 3 }}>
+              <TextField
+                fullWidth
+                label="Employer ESI (3.25%)"
+                value={payroll.emrEsic || 0}
+                variant="filled"
+                sx={calculatedFieldSx}
+                InputProps={{ readOnly: true, startAdornment: '₹' }}
+              />
+            </Grid>
+
+            {/* Gratuity */}
+            <Grid size={{ xs: 12, md: 3 }}>
+              <TextField
+                fullWidth
+                label="Gratuity"
+                value={payroll.emrGratuity || 0}
+                variant="filled"
+                sx={calculatedFieldSx}
+                InputProps={{ readOnly: true, startAdornment: '₹' }}
+              />
+            </Grid>
+
+            {/* Employer LWF */}
+            <Grid size={{ xs: 12, md: 3 }}>
+              <TextField
+                fullWidth
+                label="Employer LWF"
+                value={payroll.emrLwf || 0}
+                variant="filled"
+                sx={calculatedFieldSx}
+                InputProps={{ readOnly: true, startAdornment: '₹' }}
               />
             </Grid>
 
             {/* Summary */}
             <Grid size={12}>
-              <Card sx={{ mt: 2, backgroundColor: '#f5f5f5' }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    Salary Summary
+              <Card sx={{ mt: 2, background: 'linear-gradient(135deg, rgba(30, 60, 114, 0.05) 0%, rgba(42, 82, 152, 0.05) 100%)', border: '1px solid rgba(30, 60, 114, 0.1)' }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Typography variant="h6" gutterBottom fontWeight="bold" color="primary">
+                    Payroll Sheet Summary
                   </Typography>
-                  <Grid container spacing={2}>
-                    <Grid
-                      size={{
-                        xs: 12,
-                        md: 4
-                      }}>
-                      <Typography variant="body1">
-                        <strong>Gross Salary: ₹{payroll.grossSalary.toLocaleString()}</strong>
-                      </Typography>
+                  <Grid container spacing={3}>
+                    <Grid size={{ xs: 12, md: 3 }}>
+                      <Typography variant="caption" color="text.secondary" display="block">Gross Earned Salary (A)</Typography>
+                      <Typography variant="h6" fontWeight="bold">₹ {payroll.grossSalary.toLocaleString('en-IN')}</Typography>
                     </Grid>
-                    <Grid
-                      size={{
-                        xs: 12,
-                        md: 4
-                      }}>
-                      <Typography variant="body1">
-                        <strong>Total Deductions: ₹{payroll.totalDeductions.toLocaleString()}</strong>
-                      </Typography>
+                    <Grid size={{ xs: 12, md: 3 }}>
+                      <Typography variant="caption" color="text.secondary" display="block">Gross Deductions (B)</Typography>
+                      <Typography variant="h6" fontWeight="bold" color="error">₹ {payroll.totalDeductions.toLocaleString('en-IN')}</Typography>
                     </Grid>
-                    <Grid
-                      size={{
-                        xs: 12,
-                        md: 4
-                      }}>
-                      <Typography variant="h6" color="primary">
-                        <strong>Net Salary: ₹{payroll.netSalary.toLocaleString()}</strong>
-                      </Typography>
+                    <Grid size={{ xs: 12, md: 3 }}>
+                      <Typography variant="caption" color="text.secondary" display="block">Employee Take Home (C = A - B)</Typography>
+                      <Typography variant="h6" fontWeight="bold" color="success.main">₹ {payroll.netSalary.toLocaleString('en-IN')}</Typography>
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 3 }}>
+                      <Typography variant="caption" color="text.secondary" display="block">Total CTC of Company</Typography>
+                      <Typography variant="h6" fontWeight="bold" color="primary.main">₹ {payroll.totalCtc.toLocaleString('en-IN')}</Typography>
                     </Grid>
                   </Grid>
                 </CardContent>
@@ -759,6 +1016,14 @@ const PayrollForm: React.FC = () => {
                   variant="contained"
                   startIcon={<SaveIcon />}
                   disabled={loading}
+                  sx={{
+                    background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
+                    boxShadow: '0 4px 12px rgba(30, 60, 114, 0.2)',
+                    color: 'white',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #122548 0%, #1e3c72 100%)',
+                    }
+                  }}
                 >
                   {loading ? 'Saving...' : isEdit ? 'Update Payroll' : 'Generate Payroll'}
                 </Button>
@@ -777,7 +1042,7 @@ const PayrollForm: React.FC = () => {
           severity={snackbar.severity}
           onClose={() => setSnackbar({ ...snackbar, open: false })}
           variant="filled"
-          sx={{ whiteSpace: 'pre-line' }}
+          sx={{ whiteSpace: 'pre-line', borderRadius: 2 }}
         >
           {snackbar.message}
         </Alert>

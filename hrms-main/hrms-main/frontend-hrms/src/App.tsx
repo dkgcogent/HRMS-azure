@@ -46,9 +46,11 @@ import CardManagementForm from './pages/Cards/CardManagementForm';
 import HRPolicyForm from './pages/Policies/HRPolicyForm';
 import JobPostingForm from './pages/Recruitment/JobPostingForm';
 import LetterGenerationForm from './pages/Documents/LetterGenerationForm';
-import OfferLetterForm from './pages/Documents/OfferLetterForm';
-import OfferLetterList from './pages/Documents/OfferLetterList';
-import MyOfferLetters from './pages/Documents/MyOfferLetters';
+import AppointmentLetterList from './pages/Documents/AppointmentLetterList';
+import AppointmentLetterWorkspace from './pages/Documents/AppointmentLetterWorkspace';
+// import OfferLetterForm from './pages/Documents/OfferLetterForm';
+// import OfferLetterList from './pages/Documents/OfferLetterList';
+// import MyOfferLetters from './pages/Documents/MyOfferLetters';
 import AssetList from './pages/Assets/AssetList';
 import AssetForm from './pages/Assets/AssetForm';
 import AssetDetail from './pages/Assets/AssetDetail';
@@ -160,10 +162,12 @@ function App() {
               <Route path="/recruitment/jobs" element={<JobPostingForm />} />
 
               {/* Documents */}
-              <Route path="/documents/offer-letter" element={<OfferLetterList />} />
-              <Route path="/documents/offer-letter/new" element={<OfferLetterForm />} />
-              <Route path="/documents/my-offer-letter" element={<MyOfferLetters />} />
+              {/* <Route path="/documents/offer-letter" element={<OfferLetterList />} /> */}
+              {/* <Route path="/documents/offer-letter/new" element={<OfferLetterForm />} /> */}
+              {/* <Route path="/documents/my-offer-letter" element={<MyOfferLetters />} /> */}
               <Route path="/documents/letters" element={<LetterGenerationForm />} />
+              <Route path="/documents/appointment-letter" element={<AppointmentLetterList />} />
+              <Route path="/documents/appointment-letter/new" element={<AppointmentLetterWorkspace />} />
 
               {/* Assets */}
               <Route path="/assets" element={<AssetList />} />

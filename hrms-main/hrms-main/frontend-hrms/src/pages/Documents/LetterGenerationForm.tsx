@@ -15,6 +15,7 @@ import {
   InputAdornment,
   FormControlLabel,
   Switch,
+  Chip,
 } from '@mui/material';
 import {
   Print as PrintIcon,
@@ -109,6 +110,116 @@ const LetterGenerationForm: React.FC = () => {
     severity: 'success' as 'success' | 'error' | 'warning'
   });
 
+  // Excel-based Salary break-up states
+  const [useSalaryBreakup, setUseSalaryBreakup] = useState(false);
+  const [showAnnexure, setShowAnnexure] = useState(true);
+  const [salaryInputs, setSalaryInputs] = useState({
+    basic: 0,
+    hra: 0,
+    otherAllowances: 0,
+    leaveEncashment: 0,
+    advanceBonus: 0,
+    pTax: 0,
+    lwfSelf: 0,
+    lwfCompany: 0,
+    usePfCap: false,
+  });
+
+  // Derived calculations based on salaryInputs matching Excel structure
+  const getSalaryCalculations = () => {
+    const basicMonth = Number(salaryInputs.basic) || 0;
+    const hraMonth = Number(salaryInputs.hra) || 0;
+    const otherMonth = Number(salaryInputs.otherAllowances) || 0;
+    const leaveMonth = Number(salaryInputs.leaveEncashment) || 0;
+    const advanceMonth = Number(salaryInputs.advanceBonus) || 0;
+    const pTaxMonth = Number(salaryInputs.pTax) || 0;
+    const lwfSelfMonth = Number(salaryInputs.lwfSelf) || 0;
+    const lwfCompanyMonth = Number(salaryInputs.lwfCompany) || 0;
+
+    const basicYear = basicMonth * 12;
+    const hraYear = hraMonth * 12;
+    const otherYear = otherMonth * 12;
+    const leaveYear = leaveMonth * 12;
+    const advanceYear = advanceMonth * 12;
+
+    const grossMonth = basicMonth + hraMonth + otherMonth + leaveMonth + advanceMonth;
+    const grossYear = basicYear + hraYear + otherYear + leaveYear + advanceYear;
+
+    let pfSelfMonth = 0;
+    let pfSelfYear = 0;
+    if (salaryInputs.usePfCap) {
+      pfSelfMonth = basicMonth > 15000 ? 1800 : Math.round(basicMonth * 0.12);
+      pfSelfYear = basicYear > 180000 ? 21600 : Math.round(basicYear * 0.12);
+    } else {
+      pfSelfMonth = Math.round(basicMonth * 0.12);
+      pfSelfYear = Math.round(basicYear * 0.12);
+    }
+
+    const esicSelfMonth = grossMonth < 21001 ? Math.round(grossMonth * 0.0075) : 0;
+    const esicSelfYear = grossYear < 252012 ? Math.round(grossYear * 0.0075) : 0;
+
+    const pTaxYear = pTaxMonth * 12;
+    const lwfSelfYear = lwfSelfMonth * 12;
+
+    const grossDeductionMonth = pfSelfMonth + esicSelfMonth + pTaxMonth + lwfSelfMonth;
+    const grossDeductionYear = pfSelfYear + esicSelfYear + pTaxYear + lwfSelfYear;
+
+    const takeHomeMonth = grossMonth - grossDeductionMonth;
+    const takeHomeYear = grossYear - grossDeductionYear;
+
+    let pfCompanyMonth = 0;
+    let pfCompanyYear = 0;
+    if (salaryInputs.usePfCap) {
+      pfCompanyMonth = basicMonth > 15000 ? 1950 : Math.round(basicMonth * 0.13);
+      pfCompanyYear = basicYear > 180000 ? 23400 : Math.round(basicYear * 0.13);
+    } else {
+      pfCompanyMonth = Math.round(basicMonth * 0.13);
+      pfCompanyYear = Math.round(basicYear * 0.13);
+    }
+
+    const esicCompanyMonth = grossMonth < 21001 ? Math.round(grossMonth * 0.0325) : 0;
+    const esicCompanyYear = grossYear < 252012 ? Math.round(grossYear * 0.0325) : 0;
+
+    const gratuityMonth = Math.round(basicMonth * 15 / 26 / 12);
+    const gratuityYear = Math.round(basicYear * 15 / 26 / 12);
+
+    const lwfCompanyYear = lwfCompanyMonth * 12;
+
+    const companyAdditionalCostMonth = pfCompanyMonth + esicCompanyMonth + gratuityMonth + lwfCompanyMonth;
+    const companyAdditionalCostYear = pfCompanyYear + esicCompanyYear + gratuityYear + lwfCompanyYear;
+
+    const totalCtcMonth = grossMonth + companyAdditionalCostMonth;
+    const totalCtcYear = grossYear + companyAdditionalCostYear;
+
+    return {
+      basicMonth, basicYear,
+      hraMonth, hraYear,
+      otherMonth, otherYear,
+      leaveMonth, leaveYear,
+      advanceMonth, advanceYear,
+      grossMonth, grossYear,
+      pfSelfMonth, pfSelfYear,
+      esicSelfMonth, esicSelfYear,
+      pTaxMonth, pTaxYear,
+      lwfSelfMonth, lwfSelfYear,
+      grossDeductionMonth, grossDeductionYear,
+      takeHomeMonth, takeHomeYear,
+      pfCompanyMonth, pfCompanyYear,
+      esicCompanyMonth, esicCompanyYear,
+      gratuityMonth, gratuityYear,
+      lwfCompanyMonth, lwfCompanyYear,
+      companyAdditionalCostMonth, companyAdditionalCostYear,
+      totalCtcMonth, totalCtcYear
+    };
+  };
+
+  const calcs = getSalaryCalculations();
+
+  const formatCellVal = (val: number) => {
+    if (val === undefined || val === null || isNaN(val) || val === 0) return '-';
+    return formatIndianCurrency(Math.round(val).toString());
+  };
+
   // Watch candidateName changes to auto-update greeting name
   useEffect(() => {
     if (formData.candidateName) {
@@ -142,6 +253,16 @@ const LetterGenerationForm: React.FC = () => {
     }
   }, [formData.ctcFigure]);
 
+  // Dynamic link: Auto-update ctcFigure in the letter when Salary Breakdown Calculator is active
+  useEffect(() => {
+    if (useSalaryBreakup) {
+      setFormData(prev => ({
+        ...prev,
+        ctcFigure: formatIndianCurrency(calcs.totalCtcYear.toString())
+      }));
+    }
+  }, [calcs.totalCtcYear, useSalaryBreakup]);
+
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -168,6 +289,19 @@ const LetterGenerationForm: React.FC = () => {
       signatoryName: 'Authorized Signatory',
       companyName: 'Cogent Logistics Private Limited'
     });
+
+    setSalaryInputs({
+      basic: 16868,
+      hra: 8434,
+      otherAllowances: 3755,
+      leaveEncashment: 0,
+      advanceBonus: 0,
+      pTax: 0,
+      lwfSelf: 0,
+      lwfCompany: 0,
+      usePfCap: false,
+    });
+    setUseSalaryBreakup(false);
 
     setSnackbar({
       open: true,
@@ -286,7 +420,7 @@ const LetterGenerationForm: React.FC = () => {
             box-sizing: border-box;
             background: white !important;
             color: black !important;
-            page-break-after: avoid !important;
+            page-break-after: always !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
             overflow: hidden !important;
@@ -294,6 +428,9 @@ const LetterGenerationForm: React.FC = () => {
             box-shadow: none !important;
             border: none !important;
             margin: 0 !important;
+          }
+          .print-page:last-of-type {
+            page-break-after: avoid !important;
           }
           .print-header {
             display: ${hideHeaderInPrint ? 'none' : 'flex'} !important;
@@ -479,6 +616,224 @@ const LetterGenerationForm: React.FC = () => {
                   />
                 </Grid>
 
+                {/* Toggle Switch */}
+                <Grid item xs={12}>
+                  <Box sx={{ my: 1, display: 'flex', alignItems: 'center', gap: 1, backgroundColor: 'rgba(102, 126, 234, 0.05)', p: 1.5, borderRadius: 2, border: '1px solid rgba(102, 126, 234, 0.1)' }}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={useSalaryBreakup}
+                          onChange={(e) => setUseSalaryBreakup(e.target.checked)}
+                          color="primary"
+                        />
+                      }
+                      label={
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#667eea' }}>Use Salary Breakup Calculator</Typography>
+                          <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.2 }}>Calculates Gross, Deductions, PF, ESI, Gratuity & CTC automatically.</Typography>
+                        </Box>
+                      }
+                      sx={{ m: 0, width: '100%', justifyContent: 'space-between', flexDirection: 'row-reverse' }}
+                    />
+                  </Box>
+                </Grid>
+
+                {useSalaryBreakup && (
+                  <Grid item xs={12}>
+                    <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1, backgroundColor: 'rgba(30, 60, 114, 0.04)', p: 1.5, borderRadius: 2, border: '1px solid rgba(30, 60, 114, 0.08)' }}>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={showAnnexure}
+                            onChange={(e) => setShowAnnexure(e.target.checked)}
+                            color="primary"
+                          />
+                        }
+                        label={
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1e3c72' }}>Include Annexure Page in Letter</Typography>
+                            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.2 }}>Show salary breakdown page in print layout.</Typography>
+                          </Box>
+                        }
+                        sx={{ m: 0, width: '100%', justifyContent: 'space-between', flexDirection: 'row-reverse' }}
+                      />
+                    </Box>
+                  </Grid>
+                )}
+
+                {useSalaryBreakup ? (
+                  <>
+                    <Grid item xs={12}>
+                      <Divider sx={{ my: 1 }}><Chip label="Salary break-up components (Monthly)" size="small" color="primary" sx={{ fontWeight: 'bold' }} /></Divider>
+                    </Grid>
+
+                    {/* Basic */}
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        required
+                        fullWidth
+                        size="small"
+                        type="number"
+                        label="Basic Salary"
+                        value={salaryInputs.basic || ''}
+                        onChange={(e) => setSalaryInputs(prev => ({ ...prev, basic: parseFloat(e.target.value) || 0 }))}
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                        }}
+                      />
+                    </Grid>
+
+                    {/* HRA */}
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        required
+                        fullWidth
+                        size="small"
+                        type="number"
+                        label="HRA"
+                        value={salaryInputs.hra || ''}
+                        onChange={(e) => setSalaryInputs(prev => ({ ...prev, hra: parseFloat(e.target.value) || 0 }))}
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                        }}
+                      />
+                    </Grid>
+
+                    {/* Other Allowances */}
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        required
+                        fullWidth
+                        size="small"
+                        type="number"
+                        label="Other Allowances"
+                        value={salaryInputs.otherAllowances || ''}
+                        onChange={(e) => setSalaryInputs(prev => ({ ...prev, otherAllowances: parseFloat(e.target.value) || 0 }))}
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                        }}
+                      />
+                    </Grid>
+
+                    {/* Monthly Leave Encashment */}
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="number"
+                        label="Monthly Leave Encashment"
+                        value={salaryInputs.leaveEncashment || ''}
+                        onChange={(e) => setSalaryInputs(prev => ({ ...prev, leaveEncashment: parseFloat(e.target.value) || 0 }))}
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                        }}
+                      />
+                    </Grid>
+
+                    {/* Advance Bonus */}
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="number"
+                        label="Advance Bonus"
+                        value={salaryInputs.advanceBonus || ''}
+                        onChange={(e) => setSalaryInputs(prev => ({ ...prev, advanceBonus: parseFloat(e.target.value) || 0 }))}
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                        }}
+                      />
+                    </Grid>
+
+                    {/* Professional Tax */}
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="number"
+                        label="Professional Tax"
+                        value={salaryInputs.pTax || ''}
+                        onChange={(e) => setSalaryInputs(prev => ({ ...prev, pTax: parseFloat(e.target.value) || 0 }))}
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                        }}
+                      />
+                    </Grid>
+
+                    {/* LWF Self */}
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="number"
+                        label="LWF (Self Contribution)"
+                        value={salaryInputs.lwfSelf || ''}
+                        onChange={(e) => setSalaryInputs(prev => ({ ...prev, lwfSelf: parseFloat(e.target.value) || 0 }))}
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                        }}
+                      />
+                    </Grid>
+
+                    {/* LWF Company */}
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="number"
+                        label="LWF (Company Contribution)"
+                        value={salaryInputs.lwfCompany || ''}
+                        onChange={(e) => setSalaryInputs(prev => ({ ...prev, lwfCompany: parseFloat(e.target.value) || 0 }))}
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                        }}
+                      />
+                    </Grid>
+
+                    {/* Toggles */}
+                    <Grid item xs={12}>
+                      <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={salaryInputs.usePfCap}
+                              onChange={(e) => setSalaryInputs(prev => ({ ...prev, usePfCap: e.target.checked }))}
+                              color="secondary"
+                              size="small"
+                            />
+                          }
+                          label={<Typography variant="caption" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Limit PF to 15,000 Basic (Cap)</Typography>}
+                        />
+                      </Box>
+                    </Grid>
+
+                    {/* Real-time Summary Cards in Form */}
+                    <Grid item xs={12}>
+                      <Box sx={{ mt: 1, mb: 2, p: 2, bgcolor: '#f5f7ff', borderRadius: 3, border: '1px solid rgba(30, 60, 114, 0.08)' }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#1e3c72', mb: 1, fontSize: '0.875rem' }}>Calculator Summary</Typography>
+                        <Grid container spacing={1.5}>
+                          <Grid item xs={6}>
+                            <Typography variant="caption" color="text.secondary" display="block">Gross (Monthly)</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>₹ {calcs.grossMonth.toLocaleString('en-IN')}</Typography>
+                          </Grid>
+                          <Grid item xs={6}>
+                            <Typography variant="caption" color="text.secondary" display="block">Gross (Yearly)</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>₹ {calcs.grossYear.toLocaleString('en-IN')}</Typography>
+                          </Grid>
+                          <Grid item xs={6}>
+                            <Typography variant="caption" color="text.secondary" display="block">Take Home (Monthly)</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.main', fontSize: '0.875rem' }}>₹ {calcs.takeHomeMonth.toLocaleString('en-IN')}</Typography>
+                          </Grid>
+                          <Grid item xs={6}>
+                            <Typography variant="caption" color="text.secondary" display="block">Total CTC (Yearly)</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'primary.main', fontSize: '0.875rem' }}>₹ {calcs.totalCtcYear.toLocaleString('en-IN')}</Typography>
+                          </Grid>
+                        </Grid>
+                      </Box>
+                    </Grid>
+                  </>
+                ) : null}
+
                 {/* 7. CTC in Figure */}
                 <Grid item xs={12}>
                   <TextField
@@ -491,13 +846,16 @@ const LetterGenerationForm: React.FC = () => {
                     onFocus={() => setFocusedField('ctcFigure')}
                     onBlur={() => setFocusedField(null)}
                     placeholder="e.g. 5,00,000"
+                    disabled={useSalaryBreakup}
                     InputProps={{
+                      readOnly: useSalaryBreakup,
                       startAdornment: (
                         <InputAdornment position="start">
                           <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'text.secondary', fontSize: '10pt' }}>₹</Typography>
                         </InputAdornment>
                       ),
                     }}
+                    helperText={useSalaryBreakup ? "Auto-calculated from breakup components." : ""}
                   />
                 </Grid>
 
@@ -512,7 +870,11 @@ const LetterGenerationForm: React.FC = () => {
                     onFocus={() => setFocusedField('ctcWord')}
                     onBlur={() => setFocusedField(null)}
                     placeholder="e.g. Five Lakh Only"
-                    helperText="Auto-computed in Indian numbering format."
+                    disabled={useSalaryBreakup}
+                    InputProps={{
+                      readOnly: useSalaryBreakup
+                    }}
+                    helperText={useSalaryBreakup ? "Auto-computed from CTC figure." : "Auto-computed in Indian numbering format."}
                   />
                 </Grid>
 
@@ -738,6 +1100,238 @@ const LetterGenerationForm: React.FC = () => {
               </Box>
 
             </Paper>
+
+            {useSalaryBreakup && showAnnexure && (
+              <Paper
+                className="print-page"
+                elevation={3}
+                sx={{
+                  width: '100%',
+                  height: '297mm',
+                  maxHeight: '297mm',
+                  padding: hideHeaderInPrint ? '55mm 20mm 30mm 20mm' : '12mm 20mm 10mm 20mm',
+                  boxSizing: 'border-box',
+                  background: '#ffffff',
+                  fontFamily: '"Georgia", "Times New Roman", serif',
+                  fontSize: '11.5pt',
+                  lineHeight: 1.3,
+                  color: '#222222',
+                  position: 'relative',
+                  borderRadius: 2,
+                  border: '1px solid #e0e0e0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                  mt: 3,
+                }}
+              >
+                {/* On-screen Watermarked Pre-printed Header */}
+                {hideHeaderInPrint && (
+                  <Box className="print-header" sx={{ 
+                    position: 'absolute', 
+                    top: '10mm', 
+                    left: '18mm', 
+                    right: '18mm', 
+                    opacity: 0.3, 
+                    pointerEvents: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    borderBottom: '1.5px solid #000',
+                    pb: 0.8,
+                    zIndex: 10
+                  }}>
+                    <Box sx={{ mr: 2, display: 'flex', alignItems: 'center' }}>
+                      <Typography variant="h5" sx={{ fontFamily: '"Arial Black", sans-serif', fontWeight: 900, color: '#1e3c72', display: 'flex', alignItems: 'center', letterSpacing: '-1px' }}>
+                        c<span style={{ color: '#00c6ff', fontSize: '26px' }}>●</span>gent<span style={{ fontSize: '11px', verticalAlign: 'super', marginLeft: '2px', fontWeight: 'normal' }}>es</span>
+                      </Typography>
+                    </Box>
+                    <Box sx={{ flex: 1, textAlign: 'left', pl: 2, borderLeft: '1px solid #ccc' }}>
+                      <Typography sx={{ fontFamily: '"Georgia", serif', fontSize: '10pt', fontWeight: 'bold', color: '#1e3c72', lineHeight: 1.1 }}>
+                        Cogent Logistics Private Limited
+                      </Typography>
+                      <Typography sx={{ fontFamily: 'sans-serif', fontSize: '7pt', color: '#555', lineHeight: 1.1 }}>
+                        201C/6, Second Floor, D-21 Corporate Park, Sector.-21, Dwarka, New Delhi - 110077 India
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+
+                {/* Header section (official header image) */}
+                {!hideHeaderInPrint && (
+                  <Box className="print-header" sx={{ width: '100%', mb: 1.5, display: 'flex', justifyContent: 'center' }}>
+                    <img
+                      src={`${IMAGE_BASE_URL}/uploads/assets/offer_header.jpeg`}
+                      alt="Cogent Logistics Header"
+                      style={{ width: '100%', height: 'auto', maxHeight: '115px', objectFit: 'contain' }}
+                    />
+                  </Box>
+                )}
+
+                {/* Title */}
+                <Box sx={{ textAlign: 'center', mb: 3 }}>
+                  <Typography sx={{ fontSize: '13pt', fontFamily: 'inherit', fontWeight: 'bold', textDecoration: 'underline' }}>
+                    ANNEXURE - I (Salary Breakup Details)
+                  </Typography>
+                  <Typography sx={{ fontSize: '10pt', fontFamily: 'inherit', fontStyle: 'italic', color: '#666', mt: 0.5 }}>
+                    Candidate Name: Mr./Ms. {capitalizeWords(formData.candidateName) || '...............................'}
+                  </Typography>
+                </Box>
+
+                {/* The salary table */}
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'sans-serif', fontSize: '9.5pt', border: '1.5px solid #000' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f0f4ff', borderBottom: '1.5px solid #000' }}>
+                      <th style={{ border: '1px solid #000', padding: '6px 8px', textAlign: 'left', fontWeight: 'bold', width: '8%' }}>S.No.</th>
+                      <th style={{ border: '1px solid #000', padding: '6px 8px', textAlign: 'left', fontWeight: 'bold', width: '52%' }}>Description</th>
+                      <th style={{ border: '1px solid #000', padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', width: '20%' }}>Per Month (₹)</th>
+                      <th style={{ border: '1px solid #000', padding: '6px 8px', textAlign: 'right', fontWeight: 'bold', width: '20%' }}>Yearly (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Section I: Gross Salary */}
+                    <tr>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', fontWeight: 'bold' }}>I</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', fontWeight: 'bold' }}>Basic</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.basicMonth)}</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right', fontWeight: 'bold' }}>{formatCellVal(calcs.basicYear)}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}></td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}>HRA</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.hraMonth)}</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.hraYear)}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}></td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}>Other Allowances</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.otherMonth)}</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.otherYear)}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}></td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}>Monthly_Leave_Encashment</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.leaveMonth)}</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.leaveYear)}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}></td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}>Advance_Bonus</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.advanceMonth)}</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.advanceYear)}</td>
+                    </tr>
+                    {/* Gross Salary total */}
+                    <tr style={{ backgroundColor: '#e2ebf0', fontWeight: 'bold' }}>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}></td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}>Gross Salary on Pay Slip (A)</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.grossMonth)}</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.grossYear)}</td>
+                    </tr>
+
+                    {/* Spacer row */}
+                    <tr style={{ height: '6px' }}><td colSpan={4} style={{ border: '1px solid #000', padding: 0, backgroundColor: '#fafafa' }}></td></tr>
+
+                    {/* Section II: Deductions */}
+                    <tr>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', fontWeight: 'bold' }}>II</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', fontWeight: 'bold' }}>P.F.Deduction (Self Contribution)</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.pfSelfMonth)}</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right', fontWeight: 'bold' }}>{formatCellVal(calcs.pfSelfYear)}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}></td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}>ESI Deduction (Self Contribution)</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.esicSelfMonth)}</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.esicSelfYear)}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}></td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}>Professional Tax</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(salaryInputs.pTax)}</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.pTaxYear)}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}></td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}>Labor Welfare Fund</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(salaryInputs.lwfSelf)}</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.lwfSelfYear)}</td>
+                    </tr>
+                    {/* Gross Deduction total */}
+                    <tr style={{ backgroundColor: '#e2ebf0', fontWeight: 'bold' }}>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}></td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}>Gross Deduction (B)</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.grossDeductionMonth)}</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.grossDeductionYear)}</td>
+                    </tr>
+                    {/* Employee Take Home Salary */}
+                    <tr style={{ backgroundColor: '#222222', color: '#ffffff', fontWeight: 'bold' }}>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}></td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', color: '#ffffff' }}>Employee Take Home Salary (C=A-B)</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.takeHomeMonth)}</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.takeHomeYear)}</td>
+                    </tr>
+
+                    {/* Spacer row */}
+                    <tr style={{ height: '6px' }}><td colSpan={4} style={{ border: '1px solid #000', padding: 0, backgroundColor: '#fafafa' }}></td></tr>
+
+                    {/* Section III: Company's Contribution */}
+                    <tr>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', fontWeight: 'bold' }}>III</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', fontWeight: 'bold' }}>P.F.Deduction (Company's Contribution)</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.pfCompanyMonth)}</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right', fontWeight: 'bold' }}>{formatCellVal(calcs.pfCompanyYear)}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}></td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}>ESI Deduction (Company's Contribution)</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.esicCompanyMonth)}</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.esicCompanyYear)}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}></td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}>Gratuity</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.gratuityMonth)}</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.gratuityYear)}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}></td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}>Labor Welfare Fund</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(salaryInputs.lwfCompany)}</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.lwfCompanyYear)}</td>
+                    </tr>
+                    {/* Company's Additional Cost total */}
+                    <tr style={{ backgroundColor: '#e2ebf0', fontWeight: 'bold' }}>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}></td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}>Company's Additional Cost</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.companyAdditionalCostMonth)}</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.companyAdditionalCostYear)}</td>
+                    </tr>
+                    {/* Total CTC of Company */}
+                    <tr style={{ backgroundColor: '#222222', color: '#ffffff', fontWeight: 'bold' }}>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}></td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', color: '#ffffff' }}>Total CTC of Company</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.totalCtcMonth)}</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.totalCtcYear)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                {/* Regards bottom layout block */}
+                <Box sx={{ mt: 'auto', display: 'flex', justifyContent: 'flex-start', pb: 0.5 }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                    <Typography sx={{ fontSize: '11pt', fontFamily: 'inherit' }}>Regards,</Typography>
+                    <Typography sx={{ fontSize: '11pt', fontFamily: 'inherit', fontWeight: 'bold', fontStyle: 'italic', color: '#1e3c72', mt: 0.5 }}>
+                      For Cogent Logistics Private Limited
+                    </Typography>
+                    <Box sx={{ py: 0.8, display: 'flex', flexDirection: 'column' }}>
+                      <Box sx={{ borderBottom: '1px dotted rgba(0,0,0,0.25)', width: '130px', height: '18px' }} />
+                      <Typography sx={{ fontSize: '10pt', fontFamily: 'inherit', fontWeight: 'bold', color: '#555555', mt: 0.5 }}>
+                        Authorized Signatory
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+              </Paper>
+            )}
 
           </Box>
         </Grid>

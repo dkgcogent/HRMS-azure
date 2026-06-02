@@ -358,6 +358,29 @@ export async function ensureCoreTables() {
     console.warn('Note: offer_letters table creation:', error.message);
   });
 
+  // hrms_appointment_letters table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS hrms_appointment_letters (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      candidate_name VARCHAR(255) NOT NULL,
+      employee_id INT NULL,
+      designation VARCHAR(255) NOT NULL,
+      generated_date DATE NOT NULL,
+      joining_date DATE NOT NULL,
+      status ENUM('Draft', 'Sent', 'Viewed', 'Accepted') NOT NULL DEFAULT 'Draft',
+      monthly_ctc DECIMAL(15,2) NULL,
+      yearly_ctc DECIMAL(15,2) NULL,
+      email VARCHAR(255) NULL,
+      phone VARCHAR(50) NULL,
+      appointment_data JSON NULL,
+      pdf_path VARCHAR(1000) NULL,
+      created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  `).catch((error: any) => {
+    console.warn('Note: appointment_letters table creation:', error.message);
+  });
+
   // hrms_document_types table
   await pool.query(`
     CREATE TABLE IF NOT EXISTS hrms_document_types (

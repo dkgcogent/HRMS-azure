@@ -36,6 +36,7 @@ import kpiRoutes from './routes/kpiRoutes';
 import csvExportRoutes from './routes/csvExportRoutes';
 import taskRoutes from './routes/taskRoutes';
 import offerLetterRoutes from './routes/offerLetterRoutes';
+import appointmentLetterRoutes from './routes/appointmentLetterRoutes';
 import promotionRoutes from './routes/promotionRoutes';
 import awardRoutes from './routes/awardRoutes';
 import complianceRoutes from './routes/complianceRoutes';
@@ -303,6 +304,9 @@ if (offerLetterRoutes && typeof offerLetterRoutes === 'function') {
 app.use('/api/offer-letters', offerLetterRoutes);
 console.log('--- DEBUG: Offer letter routes registered ---');
 
+app.use('/api/appointment-letters', appointmentLetterRoutes);
+console.log('--- DEBUG: Appointment letter routes registered ---');
+
 // Global 404 handler for unmatched routes (must be last, after all routes)
 app.use((req, res) => {
   // Only handle API routes, let other routes fall through
@@ -372,4 +376,5 @@ if (!isVercel) {
 
 // Export the Express API for Vercel
 module.exports = app;
+
 
