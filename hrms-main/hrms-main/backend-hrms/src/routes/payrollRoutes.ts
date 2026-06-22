@@ -11,8 +11,10 @@ import {
   getAllPayslips,
   getPayslipById,
   createPayslip,
-  updatePayslip
+  updatePayslip,
+  deletePayslip
 } from '../controllers/payslipController';
+import { generatePayslipPdf } from '../utils/payslipPdfGenerator';
 
 const router = express.Router();
 
@@ -27,7 +29,9 @@ router.put('/employee-salary', updateEmployeeSalary); // Use PUT for upsert
 // Payslip Routes
 router.get('/', getAllPayslips);
 router.get('/:id', getPayslipById);
+router.get('/:id/pdf', (req, res) => generatePayslipPdf(parseInt(req.params.id), res));
 router.post('/', createPayslip);
 router.put('/:id', updatePayslip);
+router.delete('/:id', deletePayslip);
 
 export default router;

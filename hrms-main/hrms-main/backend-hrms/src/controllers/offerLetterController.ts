@@ -476,7 +476,7 @@ export const generateOfferLetterPDF = async (req: Request, res: Response) => {
             { sno: '', desc: 'PF Admin Charges (1%)', monthly: emrAdmin, yearly: emrAdmin * 12 },
             { sno: '', desc: `Employer ESIC (${formData.esicCovered === 'Yes' ? '3.25%' : 'N/A'})`, monthly: emrESIC, yearly: emrESIC * 12 },
             { sno: '', desc: 'Labour Welfare Fund (ER)', monthly: lwfER, yearly: lwfER * 12 },
-            { sno: '', desc: 'Gratuity (4.81% of Basic)', monthly: gratuity, yearly: gratuity * 12 },
+            { sno: '', desc: 'Gratuity * (4.81% of Basic)', monthly: gratuity, yearly: gratuity * 12 },
             { sno: '', desc: 'Total Employer Contribution', monthly: totalEMR, yearly: totalEMR * 12 },
             { sno: '', desc: '', monthly: '', yearly: '' },
             { sno: '', desc: 'Annual CTC (Gross + Employer Cont.)', monthly: formData.monthlyCTC, yearly: yearlyCtc, highlight: true }
@@ -501,6 +501,11 @@ export const generateOfferLetterPDF = async (req: Request, res: Response) => {
             currentY += rowHeight;
             doc.fillColor('#000000');
         });
+
+        // Draw Gratuity Note at the bottom of the table
+        doc.rect(col1X, currentY, 468, rowHeight).stroke();
+        doc.fillColor('#000000').font('Helvetica-Bold').fontSize(8.5);
+        doc.text('* Gratuity - will be applicable after continuous 5 years of service as per the applicable laws.', col1X + 5, currentY + 5);
 
         doc.end();
 

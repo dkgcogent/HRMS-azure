@@ -389,7 +389,7 @@ export const generateAppointmentLetterPDF = async (req: Request, res: Response) 
                 // Section III
                 { sno: 'III', desc: "P.F.Deduction (Company's Contribution)", monthly: emrPF + emrAdmin, yearly: (emrPF + emrAdmin) * 12, isSectionHeaderRow: true },
                 { sno: '', desc: "ESI Deduction (Company's Contribution)", monthly: emrESIC, yearly: emrESIC * 12 },
-                { sno: '', desc: 'Gratuity', monthly: gratuity, yearly: gratuity * 12 },
+                { sno: '', desc: 'Gratuity *', monthly: gratuity, yearly: gratuity * 12 },
                 { sno: '', desc: 'Labor Welfare Fund', monthly: lwfER, yearly: lwfER * 12 },
                 { sno: '', desc: "Company's Additional Cost", monthly: totalEMR, yearly: totalEMR * 12, highlight: true },
                 { sno: '', desc: 'Total CTC of Company', monthly: monthlyCTC, yearly: yearlyCtc, blackRow: true }
@@ -473,6 +473,14 @@ export const generateAppointmentLetterPDF = async (req: Request, res: Response) 
                 currentTableY += currentRowHeight;
             });
 
+            // Draw Gratuity Note at the bottom of the table
+            doc.save();
+            const totalWidth = col1Width + col2Width + col3Width + col4Width;
+            doc.fillColor('#ffffff').rect(cellX[0], currentTableY, totalWidth, rowHeight).fill();
+            doc.strokeColor('#000000').lineWidth(0.5).rect(cellX[0], currentTableY, totalWidth, rowHeight).stroke();
+            doc.fillColor('#000000').font('Helvetica-Bold').fontSize(8.5).text('* Gratuity - will be applicable after continuous 5 years of service as per the applicable laws.', cellX[0] + 8, currentTableY + 5.5);
+            doc.restore();
+
             doc.end();
         }
 
@@ -511,18 +519,21 @@ export const generateAppointmentLetterPDF = async (req: Request, res: Response) 
 
             } catch (dbError: any) {
                 console.error('Error saving appointment letter:', dbError);
-                res.status(500).json({ success: false, message: 'DB Error saving appointment letter', error: dbError.message });
+                import('fs').then(fs => fs.writeFileSync('backend-hrms-db-error.log', dbError.stack || dbError.message));
+                res.status(500).json({ success: false, message: 'DB Error saving appointment letter', error: dbError.message, stack: dbError.stack });
             }
         });
 
         doc.on('error', (err) => {
             console.error('PDF Generation Error:', err);
+            import('fs').then(fs => fs.writeFileSync('backend-hrms-pdf-error.log', err.stack || err.message));
             res.status(500).json({ success: false, message: 'PDF Kit Generation Error', error: err.message });
         });
 
     } catch (error: any) {
         console.error('Error in generateAppointmentLetterPDF:', error);
-        res.status(500).json({ success: false, message: 'Internal Server Error', error: error.message });
+        import('fs').then(fs => fs.writeFileSync('backend-hrms-error.log', error.stack || error.message));
+        res.status(500).json({ success: false, message: 'Internal Server Error', error: error.message, stack: error.stack });
     }
 };
 

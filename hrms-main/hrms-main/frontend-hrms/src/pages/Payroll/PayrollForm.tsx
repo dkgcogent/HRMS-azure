@@ -423,6 +423,7 @@ const PayrollForm: React.FC = () => {
         year: parseInt(yearStr, 10),
         gross_salary: payroll.grossSalary,
         net_salary: payroll.netSalary,
+        payroll_data: payroll,
       };
 
       if (isEdit && id) {

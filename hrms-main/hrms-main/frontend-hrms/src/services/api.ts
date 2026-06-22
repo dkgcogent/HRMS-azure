@@ -1356,18 +1356,23 @@ class ApiService {
     return response.data;
   }
 
-  async getPayslipById(id: number): Promise<ApiResponse<Payslip>> {
+  async getPayslipById(id: number) {
     const response = await api.get(`/api/payroll/${id}`);
     return response.data;
   }
 
-  async createPayslip(payslip: Payslip): Promise<ApiResponse<any>> {
+  async createPayslip(payslip: Partial<Payslip>) {
     const response = await api.post('/api/payroll', payslip);
     return response.data;
   }
 
-  async updatePayslip(id: number, payslip: Payslip): Promise<ApiResponse<any>> {
+  async updatePayslip(id: number, payslip: Partial<Payslip>) {
     const response = await api.put(`/api/payroll/${id}`, payslip);
+    return response.data;
+  }
+
+  async deletePayslip(id: number) {
+    const response = await api.delete(`/api/payroll/${id}`);
     return response.data;
   }
 

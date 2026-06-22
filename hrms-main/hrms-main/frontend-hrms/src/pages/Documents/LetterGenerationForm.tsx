@@ -1288,7 +1288,7 @@ const LetterGenerationForm: React.FC = () => {
                     </tr>
                     <tr>
                       <td style={{ border: '1px solid #000', padding: '5px 8px' }}></td>
-                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}>Gratuity</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}>Gratuity *</td>
                       <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.gratuityMonth)}</td>
                       <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.gratuityYear)}</td>
                     </tr>
@@ -1311,6 +1311,12 @@ const LetterGenerationForm: React.FC = () => {
                       <td style={{ border: '1px solid #000', padding: '5px 8px', color: '#ffffff' }}>Total CTC of Company</td>
                       <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.totalCtcMonth)}</td>
                       <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.totalCtcYear)}</td>
+                    </tr>
+                    {/* Gratuity Note */}
+                    <tr>
+                      <td colSpan={4} style={{ border: '1px solid #000', padding: '5px 8px', fontWeight: 'bold', textAlign: 'left' }}>
+                        * Gratuity - will be applicable after continuous 5 years of service as per the applicable laws.
+                      </td>
                     </tr>
                   </tbody>
                 </table>
