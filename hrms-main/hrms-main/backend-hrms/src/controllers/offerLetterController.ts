@@ -30,6 +30,7 @@ interface OfferLetterData {
     emyESIC: number;
     pTax: number;
     lwfEmployee: number;
+    uniformCharges: number;
     totalDeductions: number;
     netAmount: number;
     emrPF: number;
@@ -442,6 +443,7 @@ export const generateOfferLetterPDF = async (req: Request, res: Response) => {
         const emyPF = Number(formData.emyPF) || 0;
         const emyESIC = Number(formData.emyESIC) || 0;
         const pTax = Number(formData.pTax) || 0;
+        const uniformCharges = Number(formData.uniformCharges) || 0;
         const lwfEE = Number(formData.lwfEmployee) || 0;
 
         const netAmount = Number(formData.netAmount) || 0;
@@ -477,6 +479,7 @@ export const generateOfferLetterPDF = async (req: Request, res: Response) => {
             { sno: '', desc: `Employer ESIC (${formData.esicCovered === 'Yes' ? '3.25%' : 'N/A'})`, monthly: emrESIC, yearly: emrESIC * 12 },
             { sno: '', desc: 'Labour Welfare Fund (ER)', monthly: lwfER, yearly: lwfER * 12 },
             { sno: '', desc: 'Gratuity * (4.81% of Basic)', monthly: gratuity, yearly: gratuity * 12 },
+            { sno: '', desc: 'Uniform Charges', monthly: uniformCharges, yearly: uniformCharges * 12 },
             { sno: '', desc: 'Total Employer Contribution', monthly: totalEMR, yearly: totalEMR * 12 },
             { sno: '', desc: '', monthly: '', yearly: '' },
             { sno: '', desc: 'Annual CTC (Gross + Employer Cont.)', monthly: formData.monthlyCTC, yearly: yearlyCtc, highlight: true }

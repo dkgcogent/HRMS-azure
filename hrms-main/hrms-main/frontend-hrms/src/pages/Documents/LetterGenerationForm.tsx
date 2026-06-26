@@ -32,7 +32,7 @@ const numberToIndianWords = (num: number): string => {
     '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
     'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'
   ];
-  
+
   const tens = [
     '', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'
   ];
@@ -51,17 +51,17 @@ const numberToIndianWords = (num: number): string => {
     result += helper(Math.floor(temp / 10000000)) + ' Crore ';
     temp %= 10000000;
   }
-  
+
   if (Math.floor(temp / 100000) > 0) {
     result += helper(Math.floor(temp / 100000)) + ' Lakh ';
     temp %= 100000;
   }
-  
+
   if (Math.floor(temp / 1000) > 0) {
     result += helper(Math.floor(temp / 1000)) + ' Thousand ';
     temp %= 1000;
   }
-  
+
   if (temp > 0) {
     if (result !== '' && temp < 100) {
       result += 'and ' + helper(temp);
@@ -69,7 +69,7 @@ const numberToIndianWords = (num: number): string => {
       result += helper(temp);
     }
   }
-  
+
   return result.trim() ? result.trim() + ' Only' : '';
 };
 
@@ -102,7 +102,7 @@ const LetterGenerationForm: React.FC = () => {
 
   // Highlight/focus tracking for interactive live preview
   const [focusedField, setFocusedField] = useState<string | null>(null);
-  
+
   // Feedback snackbar
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -123,6 +123,7 @@ const LetterGenerationForm: React.FC = () => {
     lwfSelf: 0,
     lwfCompany: 0,
     usePfCap: false,
+    uniformCharges: 0,
   });
 
   // Derived calculations based on salaryInputs matching Excel structure
@@ -133,6 +134,7 @@ const LetterGenerationForm: React.FC = () => {
     const leaveMonth = Number(salaryInputs.leaveEncashment) || 0;
     const advanceMonth = Number(salaryInputs.advanceBonus) || 0;
     const pTaxMonth = Number(salaryInputs.pTax) || 0;
+    const uniformChargesMonth = Number(salaryInputs.uniformCharges) || 0;
     const lwfSelfMonth = Number(salaryInputs.lwfSelf) || 0;
     const lwfCompanyMonth = Number(salaryInputs.lwfCompany) || 0;
 
@@ -160,6 +162,7 @@ const LetterGenerationForm: React.FC = () => {
 
     const pTaxYear = pTaxMonth * 12;
     const lwfSelfYear = lwfSelfMonth * 12;
+    const uniformChargesYear = uniformChargesMonth * 12;
 
     const grossDeductionMonth = pfSelfMonth + esicSelfMonth + pTaxMonth + lwfSelfMonth;
     const grossDeductionYear = pfSelfYear + esicSelfYear + pTaxYear + lwfSelfYear;
@@ -185,8 +188,8 @@ const LetterGenerationForm: React.FC = () => {
 
     const lwfCompanyYear = lwfCompanyMonth * 12;
 
-    const companyAdditionalCostMonth = pfCompanyMonth + esicCompanyMonth + gratuityMonth + lwfCompanyMonth;
-    const companyAdditionalCostYear = pfCompanyYear + esicCompanyYear + gratuityYear + lwfCompanyYear;
+    const companyAdditionalCostMonth = pfCompanyMonth + esicCompanyMonth + gratuityMonth + lwfCompanyMonth + uniformChargesMonth;
+    const companyAdditionalCostYear = pfCompanyYear + esicCompanyYear + gratuityYear + lwfCompanyYear + uniformChargesYear;
 
     const totalCtcMonth = grossMonth + companyAdditionalCostMonth;
     const totalCtcYear = grossYear + companyAdditionalCostYear;
@@ -201,6 +204,7 @@ const LetterGenerationForm: React.FC = () => {
       pfSelfMonth, pfSelfYear,
       esicSelfMonth, esicSelfYear,
       pTaxMonth, pTaxYear,
+      uniformChargesMonth, uniformChargesYear,
       lwfSelfMonth, lwfSelfYear,
       grossDeductionMonth, grossDeductionYear,
       takeHomeMonth, takeHomeYear,
@@ -353,7 +357,7 @@ const LetterGenerationForm: React.FC = () => {
     if (!dateStr) return '...............................';
     const dateObj = new Date(dateStr);
     if (isNaN(dateObj.getTime())) return dateStr;
-    
+
     // Add ordinal suffix for day
     const day = dateObj.getDate();
     let suffix = 'th';
@@ -381,7 +385,8 @@ const LetterGenerationForm: React.FC = () => {
   return (
     <Box sx={{ width: '100%', py: 1 }}>
       {/* Global CSS for printing perfect single A4 sheets */}
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @media print {
           @page {
             size: A4 portrait;
@@ -760,6 +765,21 @@ const LetterGenerationForm: React.FC = () => {
                       />
                     </Grid>
 
+                    {/* Uniform Charges */}
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="number"
+                        label="Uniform Charges"
+                        value={salaryInputs.uniformCharges || ''}
+                        onChange={(e) => setSalaryInputs(prev => ({ ...prev, uniformCharges: parseFloat(e.target.value) || 0 }))}
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                        }}
+                      />
+                    </Grid>
+
                     {/* LWF Self */}
                     <Grid item xs={12} sm={6}>
                       <TextField
@@ -900,10 +920,10 @@ const LetterGenerationForm: React.FC = () => {
 
         {/* RIGHT COLUMN: Realistic Live Print Preview */}
         <Grid item xs={12} lg={7} sx={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'center' }}>
-          
+
           {/* Real-time binds container */}
           <Box id="print-container" sx={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '210mm' }}>
-            
+
             {/* --- SINGLE PAGE SHEET --- */}
             <Paper
               className="print-page"
@@ -929,12 +949,12 @@ const LetterGenerationForm: React.FC = () => {
             >
               {/* On-screen Watermarked Pre-printed Header (Only visible on screen, hidden in print) */}
               {hideHeaderInPrint && (
-                <Box className="print-header" sx={{ 
-                  position: 'absolute', 
-                  top: '10mm', 
-                  left: '18mm', 
-                  right: '18mm', 
-                  opacity: 0.3, 
+                <Box className="print-header" sx={{
+                  position: 'absolute',
+                  top: '10mm',
+                  left: '18mm',
+                  right: '18mm',
+                  opacity: 0.3,
                   pointerEvents: 'none',
                   display: 'flex',
                   alignItems: 'center',
@@ -966,12 +986,12 @@ const LetterGenerationForm: React.FC = () => {
 
               {/* On-screen Watermarked Pre-printed Footer (Only visible on screen, hidden in print) */}
               {hideHeaderInPrint && (
-                <Box className="print-footer" sx={{ 
-                  position: 'absolute', 
-                  bottom: '8mm', 
-                  left: '18mm', 
-                  right: '18mm', 
-                  opacity: 0.3, 
+                <Box className="print-footer" sx={{
+                  position: 'absolute',
+                  bottom: '8mm',
+                  left: '18mm',
+                  right: '18mm',
+                  opacity: 0.3,
                   pointerEvents: 'none',
                   display: 'flex',
                   flexDirection: 'column',
@@ -1089,7 +1109,7 @@ const LetterGenerationForm: React.FC = () => {
                   <Typography sx={{ fontSize: '11.5pt', fontFamily: 'inherit', fontWeight: 'bold', fontStyle: 'italic', color: '#1e3c72', mt: 0.5 }}>
                     For Cogent Logistics Private Limited
                   </Typography>
-                  
+
                   <Box sx={{ py: 1, display: 'flex', flexDirection: 'column' }}>
                     <Box sx={{ borderBottom: '1px dotted rgba(0,0,0,0.25)', width: '140px', height: '22px' }} />
                     <Typography sx={{ fontSize: '10.5pt', fontFamily: 'inherit', fontWeight: 'bold', color: '#555555', mt: 0.5 }}>
@@ -1127,12 +1147,12 @@ const LetterGenerationForm: React.FC = () => {
               >
                 {/* On-screen Watermarked Pre-printed Header */}
                 {hideHeaderInPrint && (
-                  <Box className="print-header" sx={{ 
-                    position: 'absolute', 
-                    top: '10mm', 
-                    left: '18mm', 
-                    right: '18mm', 
-                    opacity: 0.3, 
+                  <Box className="print-header" sx={{
+                    position: 'absolute',
+                    top: '10mm',
+                    left: '18mm',
+                    right: '18mm',
+                    opacity: 0.3,
                     pointerEvents: 'none',
                     display: 'flex',
                     alignItems: 'center',
@@ -1291,6 +1311,12 @@ const LetterGenerationForm: React.FC = () => {
                       <td style={{ border: '1px solid #000', padding: '5px 8px' }}>Gratuity *</td>
                       <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.gratuityMonth)}</td>
                       <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.gratuityYear)}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}></td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px' }}>Uniform Charges</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(salaryInputs.uniformCharges)}</td>
+                      <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(calcs.uniformChargesYear)}</td>
                     </tr>
                     <tr>
                       <td style={{ border: '1px solid #000', padding: '5px 8px' }}></td>

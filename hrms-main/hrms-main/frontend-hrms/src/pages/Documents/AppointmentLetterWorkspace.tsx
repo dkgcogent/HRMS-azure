@@ -135,6 +135,7 @@ const AppointmentLetterWorkspace: React.FC = () => {
     lwfSelf: 0,
     lwfCompany: 0,
     usePfCap: false,
+    uniformCharges: 0,
   });
 
   // Main Form Data State
@@ -161,6 +162,7 @@ const AppointmentLetterWorkspace: React.FC = () => {
     emyESIC: 0,
     pTax: 0,
     lwfEmployee: 0,
+    uniformCharges: 0,
     totalDeductions: 2224,
     netAmount: 26833,
     emrPF: 2024,
@@ -204,6 +206,8 @@ const AppointmentLetterWorkspace: React.FC = () => {
     const leaveMonth = Number(salaryInputs.leaveEncashment) || 0;
     const advanceMonth = Number(salaryInputs.advanceBonus) || 0;
     const pTaxMonth = Number(salaryInputs.pTax) || 0;
+    const uniformChargesMonth = Number(salaryInputs.uniformCharges) || 0;
+    const uniformChargesYear = uniformChargesMonth * 12;
     const lwfSelfMonth = Number(salaryInputs.lwfSelf) || 0;
     const lwfCompanyMonth = Number(salaryInputs.lwfCompany) || 0;
 
@@ -257,8 +261,8 @@ const AppointmentLetterWorkspace: React.FC = () => {
 
     const lwfCompanyYear = lwfCompanyMonth * 12;
 
-    const companyAdditionalCostMonth = pfCompanyMonth + esicCompanyMonth + gratuityMonth + lwfCompanyMonth;
-    const companyAdditionalCostYear = pfCompanyYear + esicCompanyYear + gratuityYear + lwfCompanyYear;
+    const companyAdditionalCostMonth = pfCompanyMonth + esicCompanyMonth + gratuityMonth + lwfCompanyMonth + uniformChargesMonth;
+    const companyAdditionalCostYear = pfCompanyYear + esicCompanyYear + gratuityYear + lwfCompanyYear + uniformChargesYear;
 
     const totalCtcMonth = grossMonth + companyAdditionalCostMonth;
     const totalCtcYear = grossYear + companyAdditionalCostYear;
@@ -277,6 +281,7 @@ const AppointmentLetterWorkspace: React.FC = () => {
       emyESIC: esicSelfMonth,
       pTax: pTaxMonth,
       lwfEmployee: lwfSelfMonth,
+      uniformCharges: uniformChargesMonth,
       totalDeductions: grossDeductionMonth,
       netAmount: takeHomeMonth,
       emrPF,
@@ -814,6 +819,21 @@ const AppointmentLetterWorkspace: React.FC = () => {
                       label="Professional Tax"
                       value={salaryInputs.pTax || ''}
                       onChange={(e) => setSalaryInputs(prev => ({ ...prev, pTax: parseFloat(e.target.value) || 0 }))}
+                      InputProps={{
+                        startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                      }}
+                    />
+                  </Grid>
+
+                  {/* Uniform Charges */}
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      type="number"
+                      label="Uniform Charges"
+                      value={salaryInputs.uniformCharges || ''}
+                      onChange={(e) => setSalaryInputs(prev => ({ ...prev, uniformCharges: parseFloat(e.target.value) || 0 }))}
                       InputProps={{
                         startAdornment: <InputAdornment position="start">₹</InputAdornment>,
                       }}
@@ -1381,6 +1401,12 @@ const AppointmentLetterWorkspace: React.FC = () => {
                     <td style={{ border: '1px solid #000', padding: '5px 8px' }}>Gratuity *</td>
                     <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(formData.gratuity)}</td>
                     <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(formData.gratuity * 12)}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ border: '1px solid #000', padding: '5px 8px' }}></td>
+                    <td style={{ border: '1px solid #000', padding: '5px 8px' }}>Uniform Charges</td>
+                    <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(formData.uniformCharges)}</td>
+                    <td style={{ border: '1px solid #000', padding: '5px 8px', textAlign: 'right' }}>{formatCellVal(formData.uniformCharges * 12)}</td>
                   </tr>
                   <tr>
                     <td style={{ border: '1px solid #000', padding: '5px 8px' }}></td>

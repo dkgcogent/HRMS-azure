@@ -25,6 +25,7 @@ interface AppointmentLetterData {
     emyESIC: number;
     pTax: number;
     lwfEmployee: number;
+    uniformCharges: number;
     totalDeductions: number;
     netAmount: number;
     emrPF: number;
@@ -354,6 +355,7 @@ export const generateAppointmentLetterPDF = async (req: Request, res: Response) 
             const emyPF = Number(formData.emyPF) || 0;
             const emyESIC = Number(formData.emyESIC) || 0;
             const pTax = Number(formData.pTax) || 0;
+            const uniformCharges = Number(formData.uniformCharges) || 0;
             const lwfEE = Number(formData.lwfEmployee) || 0;
 
             const netAmount = Number(formData.netAmount) || 0;
@@ -390,6 +392,7 @@ export const generateAppointmentLetterPDF = async (req: Request, res: Response) 
                 { sno: 'III', desc: "P.F.Deduction (Company's Contribution)", monthly: emrPF + emrAdmin, yearly: (emrPF + emrAdmin) * 12, isSectionHeaderRow: true },
                 { sno: '', desc: "ESI Deduction (Company's Contribution)", monthly: emrESIC, yearly: emrESIC * 12 },
                 { sno: '', desc: 'Gratuity *', monthly: gratuity, yearly: gratuity * 12 },
+                { sno: '', desc: 'Uniform Charges', monthly: uniformCharges, yearly: uniformCharges * 12 },
                 { sno: '', desc: 'Labor Welfare Fund', monthly: lwfER, yearly: lwfER * 12 },
                 { sno: '', desc: "Company's Additional Cost", monthly: totalEMR, yearly: totalEMR * 12, highlight: true },
                 { sno: '', desc: 'Total CTC of Company', monthly: monthlyCTC, yearly: yearlyCtc, blackRow: true }
