@@ -20,8 +20,12 @@ import {
   Select,
   MenuItem,
   GridProps,
+  Button,
 } from '@mui/material';
-import { Search as SearchIcon, Schedule as ScheduleIcon } from '@mui/icons-material';
+import { Search as SearchIcon, Schedule as ScheduleIcon, Upload as UploadIcon, Download as DownloadIcon } from '@mui/icons-material';
+import Papa from 'papaparse';
+import { saveAs } from 'file-saver';
+import * as XLSX from 'xlsx';
 import { apiService } from '../../services/api';
 
 // Create a Grid component that always includes component="div" for Grid items
@@ -116,6 +120,165 @@ const EmployeeAttendance: React.FC = () => {
 
     setFilteredAttendance(filtered);
   }, [searchTerm, selectedEmployee, attendance]);
+
+  const handleExportData = () => {
+    if (!filteredAttendance.length) return;
+    
+    const exportData = filteredAttendance.map(rec => ({
+      'Employee Name': `${rec.first_name || ''} ${rec.last_name || ''}`.trim(),
+      'Employee ID': rec.employee_id,
+      'Date': formatDate(rec.date),
+      'Check-In': rec.check_in_time || '-',
+      'Check-Out': rec.check_out_time || '-',
+      'Attendance Status': rec.status || 'N/A',
+      'Work Location': rec.work_location_type || '-',
+      'Manual Entry': rec.is_manual_entry ? 'Yes' : 'No',
+      'Remarks': rec.remarks || '-'
+    }));
+
+    // Export as Excel instead of CSV to better support user workflows
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance");
+    XLSX.writeFile(workbook, `Attendance_Records_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const handleImportData = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+
+    const processRecords = async (records: any[]) => {
+      let successCount = 0;
+      let errorCount = 0;
+      for (const row of records) {
+        const employee_id = row['Employee ID'] || row['employee_id'];
+        const dateStr = row['Date'] || row['date'];
+        
+        let date = dateStr;
+        // Handle numeric or string dates robustly for MySQL (YYYY-MM-DD)
+        if (typeof dateStr === 'number') {
+           const excelEpoch = new Date(1899, 11, 30);
+           const parsedDate = new Date(excelEpoch.getTime() + dateStr * 86400000);
+           date = parsedDate.toISOString().split('T')[0];
+        } else if (typeof dateStr === 'string' && dateStr) {
+           const parsed = new Date(dateStr);
+           if (!isNaN(parsed.getTime())) {
+             const year = parsed.getFullYear();
+             const month = String(parsed.getMonth() + 1).padStart(2, '0');
+             const day = String(parsed.getDate()).padStart(2, '0');
+             date = `${year}-${month}-${day}`;
+           }
+        }
+
+        const formatTime = (timeVal: any) => {
+          if (!timeVal || timeVal === '-') return null;
+          if (typeof timeVal === 'number') {
+            const totalSeconds = Math.round(timeVal * 86400);
+            const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+            const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+            const seconds = String(totalSeconds % 60).padStart(2, '0');
+            return `${hours}:${minutes}:${seconds}`;
+          }
+          if (typeof timeVal === 'string') {
+             // If it matches HH:MM:SS, just return
+             if (/^\d{2}:\d{2}:\d{2}$/.test(timeVal)) return timeVal;
+             // Try to parse using Date
+             const d = new Date(`1970-01-01 ${timeVal}`);
+             if (!isNaN(d.getTime())) {
+               return d.toTimeString().split(' ')[0];
+             }
+          }
+          return timeVal;
+        };
+
+        const check_in_time = formatTime(row['Check-In'] || row['check_in_time']);
+        const check_out_time = formatTime(row['Check-Out'] || row['check_out_time']);
+        const status = row['Attendance Status'] || row['status'] || 'PRESENT';
+        const work_location_type = row['Work Location'] || row['work_location_type'] || 'OFFICE';
+        const remarks = (row['Remarks'] || row['remarks']) === '-' ? null : (row['Remarks'] || row['remarks']);
+
+        if (employee_id && date) {
+           const res = await apiService.attendanceCreateAdmin({
+             employee_id,
+             date,
+             check_in_time,
+             check_out_time,
+             status,
+             work_location_type,
+             remarks,
+             is_manual_entry: 1
+           });
+           if (res && res.success === false) {
+             console.error('Failed to import record', row, res.message, res.error);
+             errorCount++;
+           } else {
+             successCount++;
+           }
+        }
+      }
+      await loadData();
+      if (errorCount > 0) {
+        alert(`Import completed. Saved ${successCount} records. Failed ${errorCount} records. Check console for details.`);
+      } else {
+        alert(`Import completed successfully! Saved ${successCount} records.`);
+      }
+    };
+
+    try {
+      if (file.name.endsWith('.csv')) {
+        Papa.parse(file, {
+          header: true,
+          skipEmptyLines: true,
+          complete: async (results) => {
+            try {
+              await processRecords(results.data);
+            } catch (error) {
+              console.error('Error importing attendance:', error);
+              alert('Error importing some records. Please check the console.');
+            } finally {
+              setLoading(false);
+              if (event.target) event.target.value = '';
+            }
+          },
+          error: (error: any) => {
+            console.error('Error parsing CSV:', error);
+            alert('Error parsing CSV file');
+            setLoading(false);
+            if (event.target) event.target.value = '';
+          }
+        });
+      } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          try {
+            const data = new Uint8Array(e.target?.result as ArrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const records = XLSX.utils.sheet_to_json(worksheet, { raw: false }); // raw: false gets formatted strings for dates
+            await processRecords(records);
+          } catch (error) {
+            console.error('Error parsing Excel:', error);
+            alert('Error parsing Excel file');
+          } finally {
+            setLoading(false);
+            if (event.target) event.target.value = '';
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      } else {
+        alert('Please upload a CSV or Excel (.xlsx) file.');
+        setLoading(false);
+        if (event.target) event.target.value = '';
+      }
+    } catch (e) {
+      console.error(e);
+      setLoading(false);
+      if (event.target) event.target.value = '';
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -253,9 +416,28 @@ const EmployeeAttendance: React.FC = () => {
 
       {/* Attendance Table */}
       <Paper sx={{ p: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <ScheduleIcon />
-          <Typography variant="h6">Attendance Records</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ScheduleIcon />
+            <Typography variant="h6">Attendance Records</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <input
+              type="file"
+              accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+              style={{ display: 'none' }}
+              id="import-csv-input"
+              onChange={handleImportData}
+            />
+            <label htmlFor="import-csv-input">
+              <Button component="span" variant="outlined" startIcon={<UploadIcon />} disabled={loading}>
+                Import
+              </Button>
+            </label>
+            <Button variant="contained" startIcon={<DownloadIcon />} onClick={handleExportData} disabled={loading || !filteredAttendance.length}>
+              Export
+            </Button>
+          </Box>
         </Box>
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">

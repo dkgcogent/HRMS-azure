@@ -247,20 +247,86 @@ export const markAttendance = async (req: Request, res: Response) => {
   }
 };
 
+export const getMonthlyStats = async (req: Request, res: Response) => {
+  try {
+    const { employeeId, year, month } = req.params;
+    if (!employeeId || !year || !month) {
+      return res.status(400).json({ success: false, message: 'Missing parameters' });
+    }
+
+    const [rows]: any = await pool.query(
+      `SELECT status, count(*) as count 
+       FROM hrms_attendance_records 
+       WHERE employee_id = ? AND YEAR(date) = ? AND MONTH(date) = ?
+       GROUP BY status`,
+      [employeeId, year, month]
+    );
+
+    let presentDays = 0;
+    rows.forEach((r: any) => {
+      if (['PRESENT', 'LATE', 'WORK_FROM_HOME'].includes(r.status)) {
+        presentDays += r.count;
+      } else if (r.status === 'HALF_DAY') {
+        presentDays += (r.count * 0.5);
+      }
+    });
+
+    // Default working days to the total days in that month
+    const workingDays = new Date(Number(year), Number(month), 0).getDate();
+
+    res.json({ success: true, data: { presentDays, workingDays, records: rows } });
+  } catch (error: any) {
+    console.error('Error fetching monthly stats:', error);
+    res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
+  }
+};
+
 export const createAttendanceRecord = async (req: Request, res: Response) => {
   const { employee_id, date, check_in_time, check_out_time, total_hours, status, remarks, location_latitude, location_longitude, location_address, location_accuracy, biometric_fingerprint_id, biometric_face_id, biometric_confidence, device_id, device_ip_address, device_user_agent, work_location_type, is_manual_entry, approved_by } = req.body;
   if (!employee_id || !date || !status || !work_location_type) {
     return res.status(400).json({ success: false, message: 'Required fields are missing' });
   }
   try {
+    let actualEmployeeId = employee_id;
+    // If employee_id is a string and not a number, look up the internal integer ID
+    if (typeof employee_id === 'string' && isNaN(Number(employee_id))) {
+      const [empRows]: any = await pool.query('SELECT id FROM hrms_employees WHERE employee_id = ? LIMIT 1', [employee_id]);
+      if (empRows.length > 0) {
+        actualEmployeeId = empRows[0].id;
+      } else {
+        return res.status(400).json({ success: false, message: 'Employee not found for the given ID' });
+      }
+    }
+
     const [result]: any = await pool.query(
       'INSERT INTO hrms_attendance_records (employee_id, date, check_in_time, check_out_time, total_hours, status, remarks, location_latitude, location_longitude, location_address, location_accuracy, biometric_fingerprint_id, biometric_face_id, biometric_confidence, device_id, device_ip_address, device_user_agent, work_location_type, is_manual_entry, approved_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [employee_id, date, check_in_time, check_out_time, total_hours, status, remarks, location_latitude, location_longitude, location_address, location_accuracy, biometric_fingerprint_id, biometric_face_id, biometric_confidence, device_id, device_ip_address, device_user_agent, work_location_type, is_manual_entry, approved_by]
+      [
+        actualEmployeeId, 
+        date, 
+        check_in_time ?? null, 
+        check_out_time ?? null, 
+        total_hours ?? null, 
+        status, 
+        remarks ?? null, 
+        location_latitude ?? null, 
+        location_longitude ?? null, 
+        location_address ?? null, 
+        location_accuracy ?? null, 
+        biometric_fingerprint_id ?? null, 
+        biometric_face_id ?? null, 
+        biometric_confidence ?? null, 
+        device_id ?? null, 
+        device_ip_address ?? null, 
+        device_user_agent ?? null, 
+        work_location_type, 
+        is_manual_entry ?? 0, 
+        approved_by ?? null
+      ]
     );
     res.status(201).json({ success: true, message: 'Attendance Record created successfully', id: result.insertId });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating attendance record:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    res.status(500).json({ success: false, message: 'Internal server error', error: error?.sqlMessage || error?.message || String(error) });
   }
 };
 

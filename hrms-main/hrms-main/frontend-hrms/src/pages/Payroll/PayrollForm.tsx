@@ -160,6 +160,30 @@ const PayrollForm: React.FC = () => {
   }, [isEdit, id]);
 
   useEffect(() => {
+    if (payroll.employeeId && payroll.month) {
+      const [yearStr, monthStr] = payroll.month.split('-');
+      const year = parseInt(yearStr, 10);
+      const month = parseInt(monthStr, 10);
+      
+      const fetchAttendance = async () => {
+        try {
+          const response = await apiService.getEmployeeAttendanceStats(payroll.employeeId, year, month);
+          if (response.success && response.data) {
+             setPayroll(prev => ({
+               ...prev,
+               workingDays: response.data.workingDays || 0,
+               presentDays: response.data.presentDays || 0,
+             }));
+          }
+        } catch(error) {
+          console.warn('Error fetching attendance stats', error);
+        }
+      };
+      fetchAttendance();
+    }
+  }, [payroll.employeeId, payroll.month]);
+
+  useEffect(() => {
     calculateSalary();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -323,22 +347,23 @@ const PayrollForm: React.FC = () => {
     setPayroll(prev => ({ ...prev, employeeId }));
 
     try {
-      // Query the employee's offer letters
-      const response = await axios.get(`${API_BASE_URL}/api/offer-letters/my-letters/${employeeId}`);
+      // Query the employee's appointment letters
+      const response = await axios.get(`${API_BASE_URL}/api/appointment-letters/my-letters/${employeeId}`);
       if (response.data.success && response.data.data && response.data.data.length > 0) {
-        // Take the latest offer letter
+        // Take the latest appointment letter
         const latestLetter = response.data.data[0];
         
-        // Fetch full letter details to get offer_data
-        const detailsResponse = await axios.get(`${API_BASE_URL}/api/offer-letters/${latestLetter.id}`);
+        // Fetch full letter details to get appointment_data
+        const detailsResponse = await axios.get(`${API_BASE_URL}/api/appointment-letters/${latestLetter.id}`);
         if (detailsResponse.data.success && detailsResponse.data.data) {
           const letterDetails = detailsResponse.data.data;
-          // Parse offer_data
-          const offerData = typeof letterDetails.offer_data === 'string' 
-            ? JSON.parse(letterDetails.offer_data) 
-            : letterDetails.offer_data;
+          // Parse appointment_data
+          const offerData = typeof letterDetails.appointment_data === 'string' 
+            ? JSON.parse(letterDetails.appointment_data) 
+            : letterDetails.appointment_data;
           
           if (offerData) {
+            console.log('Setting payroll data with offerData:', offerData);
             setPayroll(prev => ({
               ...prev,
               baseGrossSalary: Number(offerData.grossSalary) || 0,
@@ -358,7 +383,7 @@ const PayrollForm: React.FC = () => {
             
             setSnackbar({
               open: true,
-              message: `Loaded salary structure from employee's latest Offer Letter!`,
+              message: `Loaded salary structure from employee's latest Appointment Letter!`,
               severity: 'success'
             });
             return;
@@ -366,16 +391,16 @@ const PayrollForm: React.FC = () => {
         }
       }
     } catch (error) {
-      console.warn('Error loading employee salary structure from Offer Letter:', error);
+      console.warn('Error loading employee salary structure from Appointment Letter:', error);
     }
 
     // Fallback default values
     setPayroll(prev => ({
       ...prev,
-      baseGrossSalary: 29057,
-      baseBasic: 16868,
-      baseHra: 8434,
-      baseOther: 3755,
+      baseGrossSalary: 0,
+      baseBasic: 0,
+      baseHra: 0,
+      baseOther: 0,
       baseBonus: 0,
       baseLeave: 0,
       baseAdvance: 0,

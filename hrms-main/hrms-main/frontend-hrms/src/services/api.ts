@@ -461,6 +461,24 @@ export interface PageResponse<T> {
 // API Service class
 class ApiService {
   // Attendance APIs (RBAC)
+  async attendanceCreateAdmin(payload: any) {
+    try {
+      const response = await api.post('/api/attendance', payload);
+      return response.data;
+    } catch (error: any) {
+      return handleApiError(error, 'create attendance admin', null);
+    }
+  }
+
+  async getEmployeeAttendanceStats(employeeId: number, year: number, month: number) {
+    try {
+      const response = await api.get(`/api/attendance/employee-stats/${employeeId}/${year}/${month}`);
+      return response.data;
+    } catch (error: any) {
+      return handleApiError(error, 'fetch attendance stats', null);
+    }
+  }
+
   async attendanceMark(payload: { latitude?: number; longitude?: number; accuracy?: number; address?: string }) {
     try {
       const response = await api.post('/api/attendance/mark', payload || {});

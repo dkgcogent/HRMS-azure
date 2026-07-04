@@ -626,7 +626,7 @@ export const getMyAppointmentLetters = async (req: Request, res: Response) => {
         const [rows] = await pool.query<AppointmentLetterRecord[]>(
             `SELECT id, candidate_name, designation, generated_date, status, pdf_path, monthly_ctc, yearly_ctc 
              FROM hrms_appointment_letters 
-             WHERE employee_id = ? AND status != 'Draft' 
+             WHERE employee_id = ? 
              ORDER BY created_at DESC`,
             [employeeId]
         );

@@ -151,9 +151,9 @@ const AppointmentLetterWorkspace: React.FC = () => {
     dob: '',
     calculationBasis: 'Old Basis' as 'Old Basis' | 'New Government Rule',
     esicCovered: 'No' as 'Yes' | 'No',
-    basicSalary: 16868,
-    hra: 8434,
-    otherAllowances: 3755,
+    basicSalary: 0,
+    hra: 0,
+    otherAllowances: 0,
     performanceBonus: 0,
     leaveEncashment: 0,
     advanceBonus: 0,
@@ -370,9 +370,9 @@ const AppointmentLetterWorkspace: React.FC = () => {
       employeeId: null
     });
     setSalaryInputs({
-      basic: 16868,
-      hra: 8434,
-      otherAllowances: 3755,
+      basic: 0,
+      hra: 0,
+      otherAllowances: 0,
       leaveEncashment: 0,
       advanceBonus: 0,
       pTax: 0,

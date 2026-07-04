@@ -18,7 +18,8 @@ import {
   getMyRegularizationStatus,
   getPendingManualRequests,
   getPendingRegularizationRequests,
-  gpsMark
+  gpsMark,
+  getMonthlyStats
 } from '../controllers/attendanceController';
 import { authenticateToken, authorizeRoles } from '../middleware/auth';
 
@@ -28,6 +29,7 @@ const router = express.Router();
 router.use(authenticateToken);
 
 // Employee endpoints
+router.get('/employee-stats/:employeeId/:year/:month', authorizeRoles('hr', 'admin'), getMonthlyStats);
 router.post('/mark', authorizeRoles('employee', 'hr', 'admin'), markAttendance);                  // alias
 router.post('/auto-login', authorizeRoles('employee', 'hr', 'admin'), autoClockIn);              // alias
 router.post('/gps-mark', authorizeRoles('employee', 'hr', 'admin'), gpsMark);                    // alias
@@ -51,7 +53,7 @@ router.get('/regularization/pending', authorizeRoles('hr', 'admin'), getPendingR
 // Admin/general (legacy CRUD if needed)
 router.get('/', authorizeRoles('admin'), getAllAttendanceRecords);
 router.get('/:id', authorizeRoles('admin'), getAttendanceRecordById);
-router.post('/', authorizeRoles('admin'), createAttendanceRecord);
+router.post('/', authorizeRoles('hr', 'admin'), createAttendanceRecord);
 router.put('/:id', authorizeRoles('admin'), updateAttendanceRecord);
 router.delete('/:id', authorizeRoles('admin'), deleteAttendanceRecord);
 
