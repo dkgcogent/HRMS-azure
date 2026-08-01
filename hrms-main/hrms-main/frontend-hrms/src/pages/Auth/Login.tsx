@@ -121,26 +121,6 @@ const Login: React.FC = () => {
         return;
       }
 
-      // Fallback for dev if backend route not available (e.g., 404 Cannot POST)
-      const u = formData.username.trim();
-      const p = formData.password;
-      const isEmployee = u === 'employee1' && p === 'emp123';
-      const isHR = u === 'hr1' && p === 'hr123';
-      const isAdmin = u === 'admin' && p === 'admin123';
-      if (errorMessage.includes('Cannot POST /api/auth/login') && (isEmployee || isHR || isAdmin)) {
-        const role = isEmployee ? 'employee' : isHR ? 'hr' : 'admin';
-        const name = isEmployee ? 'Employee One' : isHR ? 'HR One' : 'Admin User';
-        const token = 'dev-token';
-        const employeeId = isEmployee ? '31' : undefined; // Use real ID 31 for demo employee
-        authLogin(token, role, name, employeeId);
-        localStorage.setItem('username', u);
-
-        // Redirect employees to attendance, others to dashboard
-        const redirectPath = isEmployee ? '/attendance' : '/dashboard';
-        navigate(redirectPath);
-        return;
-      }
-
       setError(errorMessage || 'Invalid username or password');
     } catch (error: any) {
       console.error('Login error:', error);
@@ -243,20 +223,7 @@ const Login: React.FC = () => {
             </Button>
           </Box>
 
-          <Box sx={{ mt: 2, textAlign: 'center' }}>
-            <Typography variant="body2" color="text.secondary">
-              Demo Credentials:
-            </Typography>
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              <strong>Employee:</strong> employee1 / emp123
-            </Typography>
-            <Typography variant="body2">
-              <strong>HR:</strong> hr1 / hr123
-            </Typography>
-            <Typography variant="body2">
-              <strong>Admin:</strong> admin / admin123
-            </Typography>
-          </Box>
+
         </Paper>
       </Box>
     </Container>

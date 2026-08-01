@@ -189,12 +189,15 @@ const DesignationList: React.FC = () => {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this designation? This action cannot be undone.')) {
       try {
-        await apiService.deleteDesignation(id);
+        const result = await apiService.deleteDesignation(id);
+        if (result && result.success === false) {
+          throw new Error(result.message || 'Failed to delete designation');
+        }
         setSnackbar({ open: true, message: 'Designation deleted successfully', severity: 'success' });
         loadDesignations();
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error deleting designation:', error);
-        setSnackbar({ open: true, message: 'Failed to delete designation. It may be in use by employees.', severity: 'error' });
+        setSnackbar({ open: true, message: error.message || 'Failed to delete designation. It may be in use by employees.', severity: 'error' });
       }
     }
   };

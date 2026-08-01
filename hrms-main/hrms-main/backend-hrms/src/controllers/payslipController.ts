@@ -25,9 +25,20 @@ export const getPayslipById = async (req: Request, res: Response) => {
   }
 };
 
+export const getPayslipsByEmployee = async (req: Request, res: Response) => {
+  const { employeeId } = req.params;
+  try {
+    const [rows]: any = await pool.query('SELECT * FROM hrms_payslips WHERE employee_id = ? ORDER BY year DESC, month DESC', [employeeId]);
+    res.json({ success: true, message: "Payslips fetched successfully", data: rows });
+  } catch (error) {
+    console.error('Error fetching employee payslips:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
 export const createPayslip = async (req: Request, res: Response) => {
   const { employee_id, month, year, gross_salary, net_salary, payroll_data } = req.body;
-  if (!employee_id || !month || !year || !gross_salary || !net_salary) {
+  if (!employee_id || !month || !year || gross_salary === undefined || gross_salary === null || net_salary === undefined || net_salary === null) {
     return res.status(400).json({ success: false, message: 'All fields are required' });
   }
   try {
@@ -46,9 +57,10 @@ export const createPayslip = async (req: Request, res: Response) => {
 export const updatePayslip = async (req: Request, res: Response) => {
   const { id } = req.params;
   const { employee_id, month, year, gross_salary, net_salary, payroll_data } = req.body;
-  if (!employee_id || !month || !year || !gross_salary || !net_salary) {
+  if (!employee_id || !month || !year || gross_salary === undefined || gross_salary === null || net_salary === undefined || net_salary === null) {
     return res.status(400).json({ success: false, message: 'All fields are required' });
   }
+
   try {
     const payrollDataStr = payroll_data ? JSON.stringify(payroll_data) : null;
     const [result]: any = await pool.query(

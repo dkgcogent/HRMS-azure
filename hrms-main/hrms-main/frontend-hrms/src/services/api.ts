@@ -479,6 +479,18 @@ class ApiService {
     }
   }
 
+  async getEmployeeAttendanceRangeStats(employeeId: number, fromDate: string, toDate: string) {
+    try {
+      const response = await api.get(`/api/attendance/employee-range-stats/${employeeId}`, {
+        params: { fromDate, toDate }
+      });
+      return response.data;
+    } catch (error: any) {
+      return handleApiError(error, 'fetch attendance range stats', null);
+    }
+  }
+
+
   async attendanceMark(payload: { latitude?: number; longitude?: number; accuracy?: number; address?: string }) {
     try {
       const response = await api.post('/api/attendance/mark', payload || {});
@@ -607,7 +619,7 @@ class ApiService {
   }
 
   // Employee APIs
-  async getEmployees(page = 1, limit = 10, search = '') {
+  async getEmployees(page = 1, limit = 1000, search = '') {
     try {
       return await retryApiCall(async () => {
         const response = await api.get('/api/employees', {
@@ -1275,40 +1287,6 @@ class ApiService {
   }
 
   // PDF Generation APIs
-  async generateKPIPDF(kpiId: number): Promise<ApiResponse<{ filePath: string; fileName: string }>> {
-    const response = await api.post(`/api/pdf/kpi/${kpiId}/generate`);
-    return response.data;
-  }
-
-  async downloadKPIPDF(kpiId: number): Promise<Blob> {
-    try {
-      const response = await api.get(`/api/pdf/kpi/${kpiId}/download`, {
-        responseType: 'blob',
-      });
-
-      // Check if response is actually an error JSON (sometimes errors come as blobs)
-      if (response.data instanceof Blob && response.data.type === 'application/json') {
-        const text = await response.data.text();
-        const errorData = JSON.parse(text);
-        throw new Error(errorData.message || 'Failed to download PDF');
-      }
-
-      return response.data;
-    } catch (error: any) {
-      // If it's an axios error with response, try to parse error message
-      if (error.response && error.response.data instanceof Blob) {
-        try {
-          const text = await error.response.data.text();
-          const errorData = JSON.parse(text);
-          throw new Error(errorData.message || 'Failed to download PDF');
-        } catch (parseError) {
-          throw new Error('Failed to download PDF. Please try again.');
-        }
-      }
-      throw error;
-    }
-  }
-
   async generateAssetPDF(assetId: number): Promise<ApiResponse<{ filePath: string; fileName: string }>> {
     const response = await api.post(`/api/pdf/asset/${assetId}/generate`);
     return response.data;
@@ -1334,16 +1312,6 @@ class ApiService {
   }
 
   // CSV Export APIs
-  async exportKPIToCSV(): Promise<Blob> {
-    const response = await api.get('/api/csv-export/kpi', {
-      responseType: 'blob',
-      headers: {
-        'Accept': 'text/csv',
-      },
-    });
-    return response.data;
-  }
-
   async exportAssetsToCSV(): Promise<Blob> {
     const response = await api.get('/api/csv-export/assets', {
       responseType: 'blob',
@@ -1364,6 +1332,69 @@ class ApiService {
     return response.data;
   }
 
+
+
+  // ----------------------------------------------------------------------
+  // KRA MANAGEMENT
+  // ----------------------------------------------------------------------
+
+  async getKRATemplates() {
+    const response = await api.get('/api/kra/templates');
+    return response.data;
+  }
+
+  async getKRATemplateById(id: string) {
+    const response = await api.get(`/api/kra/templates/${id}`);
+    return response.data;
+  }
+
+  async createKRATemplate(template: any) {
+    const response = await api.post('/api/kra/templates', template);
+    return response.data;
+  }
+
+  async updateKRATemplate(id: string, template: any) {
+    const response = await api.put(`/api/kra/templates/${id}`, template);
+    return response.data;
+  }
+
+  async deleteKRATemplate(id: string) {
+    const response = await api.delete(`/api/kra/templates/${id}`);
+    return response.data;
+  }
+
+  async getKRAAssignments() {
+    const response = await api.get('/api/kra/assignments');
+    return response.data;
+  }
+
+  async assignKRATemplate(assignment: any) {
+    const response = await api.post('/api/kra/assignments', assignment);
+    return response.data;
+  }
+
+  async removeKRAAssignment(id: string) {
+    const response = await api.delete(`/api/kra/assignments/${id}`);
+    return response.data;
+  }
+
+  async getKRAAuditLogs() {
+    const response = await api.get('/api/kra/audit-logs');
+    return response.data;
+  }
+
+  async getMyKRA(employeeId: string, financialYear?: string) {
+    const response = await api.get('/api/kra/my-kra', {
+      params: { employeeId, financialYear }
+    });
+    return response.data;
+  }
+
+  async saveMyKRAScores(payload: { employeeId: string; financialYear?: string; templateId?: string; scores: any[] }) {
+    const response = await api.post('/api/kra/my-kra/save', payload);
+    return response.data;
+  }
+
   async updateEmployeeSalary(employeeSalary: EmployeeSalary): Promise<ApiResponse<any>> {
     const response = await api.put('/api/payroll/employee-salary', employeeSalary);
     return response.data;
@@ -1371,6 +1402,11 @@ class ApiService {
 
   async getPayslips(): Promise<ApiResponse<Payslip[]>> {
     const response = await api.get('/api/payroll');
+    return response.data;
+  }
+
+  async getPayslipsByEmployee(employeeId: number): Promise<ApiResponse<Payslip[]>> {
+    const response = await api.get(`/api/payroll/employee/${employeeId}`);
     return response.data;
   }
 

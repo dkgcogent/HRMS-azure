@@ -74,10 +74,22 @@ export const generatePayslipPdf = async (payslipId: number, res: Response) => {
         doc.font('Helvetica-Bold').fontSize(12).text(`Pay Slip For The Month Of : ${monthName} ${payslip.year}`, 0, 95, { align: 'center', underline: true });
         
         // Helper function for table borders
-        const drawCell = (x: number, y: number, w: number, h: number, text: string, align: 'left'|'center'|'right' = 'left', isBold = false) => {
+        const drawCell = (x: number, y: number, w: number, h: number, text: string, align: 'left' | 'center' | 'right' = 'left', isHeader = false) => {
             doc.rect(x, y, w, h).stroke();
-            doc.font(isBold ? 'Helvetica-Bold' : 'Helvetica').fontSize(10);
-            doc.text(text, x + 5, y + 5, { width: w - 10, align: align });
+            doc.font(isHeader ? 'Helvetica-Bold' : 'Helvetica').fontSize(10);
+            
+            const strText = String(text);
+            let textX = x + 5;
+            if (align === 'center') {
+                textX = x + (w - doc.widthOfString(strText)) / 2;
+            } else if (align === 'right') {
+                textX = x + w - 5 - doc.widthOfString(strText);
+            }
+            
+            doc.save();
+            doc.rect(x, y, w, h).clip();
+            doc.text(strText, textX, y + 5, { lineBreak: false });
+            doc.restore();
         };
 
         // --- EMPLOYEE DETAILS TABLE ---

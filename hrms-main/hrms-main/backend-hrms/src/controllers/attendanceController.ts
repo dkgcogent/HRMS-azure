@@ -281,6 +281,44 @@ export const getMonthlyStats = async (req: Request, res: Response) => {
   }
 };
 
+export const getAttendanceRangeStats = async (req: Request, res: Response) => {
+  try {
+    const { employeeId } = req.params;
+    const { fromDate, toDate } = req.query;
+    if (!employeeId || !fromDate || !toDate) {
+      return res.status(400).json({ success: false, message: 'Missing employeeId, fromDate, or toDate' });
+    }
+
+    const [rows]: any = await pool.query(
+      `SELECT status, count(*) as count 
+       FROM hrms_attendance_records 
+       WHERE employee_id = ? AND date >= ? AND date <= ?
+       GROUP BY status`,
+      [employeeId, fromDate, toDate]
+    );
+
+    let presentDays = 0;
+    rows.forEach((r: any) => {
+      if (['PRESENT', 'LATE', 'WORK_FROM_HOME'].includes(r.status)) {
+        presentDays += r.count;
+      } else if (r.status === 'HALF_DAY') {
+        presentDays += (r.count * 0.5);
+      }
+    });
+
+    const start = new Date(fromDate as string);
+    const end = new Date(toDate as string);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const workingDays = isNaN(diffTime) ? 0 : Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+    res.json({ success: true, data: { presentDays, workingDays, records: rows } });
+  } catch (error: any) {
+    console.error('Error fetching range stats:', error);
+    res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
+  }
+};
+
+
 export const createAttendanceRecord = async (req: Request, res: Response) => {
   const { employee_id, date, check_in_time, check_out_time, total_hours, status, remarks, location_latitude, location_longitude, location_address, location_accuracy, biometric_fingerprint_id, biometric_face_id, biometric_confidence, device_id, device_ip_address, device_user_agent, work_location_type, is_manual_entry, approved_by } = req.body;
   if (!employee_id || !date || !status || !work_location_type) {

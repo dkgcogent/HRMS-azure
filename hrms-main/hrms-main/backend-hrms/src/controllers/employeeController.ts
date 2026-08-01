@@ -1,6 +1,7 @@
 
 import { Request, Response } from 'express';
 import pool from '../db';
+import bcrypt from 'bcryptjs';
 
 // Define upload base directory on D: drive
 import { UPLOAD_BASE_DIR } from '../config/uploadConfig';
@@ -298,7 +299,7 @@ export const createEmployee = async (req: Request, res: Response) => {
     console.log('=== DATABASE INSERTION START ===');
     const insertData = [
       employeeId, firstName, middleName, lastName, gender, formattedDateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoPath, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, formattedJoiningDate, status, 
-      bankId, accountNumber, accountHolderName || null, ifscCode || null, branchName || null, paymentModeId, customerId || null, projectId || null,
+      Number(bankId) || null, accountNumber, accountHolderName || null, ifscCode || null, branchName || null, paymentModeId, Number(customerId) || null, Number(projectId) || null,
       emergencyContactName || null, emergencyContactNumber || null, emergencyContactRelation || null, personalEmail || null, alternateNumber || null, maritalStatus || 'SINGLE', bloodGroup || null
     ];
     console.log('Insert parameters:', insertData);
@@ -318,6 +319,23 @@ export const createEmployee = async (req: Request, res: Response) => {
         'INSERT INTO hrms_employee_qualifications (employee_id, qualification_id) VALUES ?',
         [qualificationValues]
       );
+    }
+
+    // Auto-create login user for the employee
+    try {
+      console.log('Creating login account for new employee:', employeeId);
+      const defaultPassword = 'password123';
+      const passwordHash = bcrypt.hashSync(defaultPassword, 10);
+      const fullName = `${firstName} ${middleName ? middleName + ' ' : ''}${lastName}`.trim();
+      
+      await pool.query(
+        'INSERT INTO hrms_users (username, full_name, role, password_hash, employee_id, department_id) VALUES (?, ?, ?, ?, ?, ?)',
+        [employeeId, fullName, 'employee', passwordHash, newEmployeeId, departmentId || null]
+      );
+      console.log('Login account created successfully');
+    } catch (userError) {
+      console.error('Error creating login account for employee:', userError);
+      // We don't fail the whole request if user creation fails, but log it
     }
 
     res.status(201).json({ success: true, message: 'Employee created successfully', id: newEmployeeId });
@@ -414,7 +432,7 @@ export const updateEmployee = async (req: Request, res: Response) => {
 
     const updateData = [
       employeeId, firstName, middleName, lastName, gender, formattedDateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoPath, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, formattedJoiningDate, status, 
-      bankId, accountNumber, accountHolderName || null, ifscCode || null, branchName || null, paymentModeId, customerId || null, projectId || null,
+      Number(bankId) || null, accountNumber, accountHolderName || null, ifscCode || null, branchName || null, paymentModeId, Number(customerId) || null, Number(projectId) || null,
       emergencyContactName || null, emergencyContactNumber || null, emergencyContactRelation || null, personalEmail || null, alternateNumber || null, maritalStatus || 'SINGLE', bloodGroup || null,
       id
     ];
@@ -469,15 +487,55 @@ export const updateEmployee = async (req: Request, res: Response) => {
 
 export const deleteEmployee = async (req: Request, res: Response) => {
   const { id } = req.params;
+  let connection;
   try {
-    const [result]: any = await pool.query('DELETE FROM hrms_employees WHERE id = ?', [id]);
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    // Delete related records to prevent foreign key constraint errors
+    const tables = [
+      'hrms_users',
+      'hrms_payslips',
+      'hrms_attendance_records',
+      'hrms_leave_requests',
+      'hrms_leave_balances',
+      'hrms_employee_documents',
+      'hrms_employee_qualifications',
+      'employee_salary',
+      'esi_records',
+      'pf_records',
+      'hrms_awards',
+      'id_cards',
+      'visiting_cards',
+      'hrms_kpis'
+    ];
+
+    for (const table of tables) {
+      try {
+        await connection.query(`DELETE FROM ${table} WHERE employee_id = ?`, [id]);
+      } catch (err: any) {
+        console.log(`Could not delete from ${table}:`, err.message);
+      }
+    }
+
+    const [result]: any = await connection.query('DELETE FROM hrms_employees WHERE id = ?', [id]);
+    
+    await connection.commit();
+
     if (result.affectedRows === 0) {
       return res.status(404).json({ success: false, message: 'Employee not found' });
     }
     res.json({ success: true, message: 'Employee deleted successfully' });
-  } catch (error) {
+  } catch (error: any) {
+    if (connection) await connection.rollback();
     console.error('Error deleting employee:', error);
+    
+    if (error.code === 'ER_ROW_IS_REFERENCED_2') {
+      return res.status(400).json({ success: false, message: 'Cannot delete employee. They have associated records that must be deleted first.' });
+    }
     res.status(500).json({ success: false, message: 'Internal server error' });
+  } finally {
+    if (connection) connection.release();
   }
 };
 
@@ -715,7 +773,7 @@ export const createEmployeeWithPhoto = async (req: Request, res: Response) => {
     console.log('=== DATABASE INSERTION START ===');
     const insertData = [
       employeeId, firstName, middleName, lastName, gender, formattedDateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoFileName || photoPath, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, formattedJoiningDate, status, 
-      bankId, accountNumber, accountHolderName || null, ifscCode || null, branchName || null, paymentModeId, customerId || null, projectId || null,
+      Number(bankId) || null, accountNumber, accountHolderName || null, ifscCode || null, branchName || null, paymentModeId, Number(customerId) || null, Number(projectId) || null,
       emergencyContactName || null, emergencyContactNumber || null, emergencyContactRelation || null, personalEmail || null, alternateNumber || null, maritalStatus || 'SINGLE', bloodGroup || null
     ];
     console.log('Insert parameters:', insertData);
@@ -726,11 +784,29 @@ export const createEmployeeWithPhoto = async (req: Request, res: Response) => {
     );
     console.log('=== DATABASE INSERTION SUCCESSFUL ===');
     console.log('Insert result:', result);
+    const newEmployeeId = result.insertId;
+
+    // Auto-create login user for the employee
+    try {
+      console.log('Creating login account for new employee:', employeeId);
+      const defaultPassword = 'password123';
+      const passwordHash = bcrypt.hashSync(defaultPassword, 10);
+      const fullName = `${firstName} ${middleName ? middleName + ' ' : ''}${lastName}`.trim();
+      
+      await pool.query(
+        'INSERT INTO hrms_users (username, full_name, role, password_hash, employee_id, department_id) VALUES (?, ?, ?, ?, ?, ?)',
+        [employeeId, fullName, 'employee', passwordHash, newEmployeeId, departmentId || null]
+      );
+      console.log('Login account created successfully');
+    } catch (userError) {
+      console.error('Error creating login account for employee:', userError);
+      // We don't fail the whole request if user creation fails, but log it
+    }
 
     res.status(201).json({
       success: true,
       message: 'Employee created successfully',
-      id: result.insertId,
+      id: newEmployeeId,
       photoPath: photoFileName
     });
   } catch (error: any) {
@@ -870,7 +946,7 @@ export const updateEmployeeWithPhoto = async (req: Request, res: Response) => {
 
     const updateData = [
       employeeId, firstName, middleName, lastName, gender, formattedDateOfBirth, mobile, email, workEmail, address, city, state, pincode, photoFileName, manpowerTypeId, departmentId, designationId, workLocationId, shiftId, formattedJoiningDate, status, 
-      bankId, accountNumber, accountHolderName || null, ifscCode || null, branchName || null, paymentModeId, customerId || null, projectId || null,
+      Number(bankId) || null, accountNumber, accountHolderName || null, ifscCode || null, branchName || null, paymentModeId, Number(customerId) || null, Number(projectId) || null,
       emergencyContactName || null, emergencyContactNumber || null, emergencyContactRelation || null, personalEmail || null, alternateNumber || null, maritalStatus || 'SINGLE', bloodGroup || null,
       id
     ];

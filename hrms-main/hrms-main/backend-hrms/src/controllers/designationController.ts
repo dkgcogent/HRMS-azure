@@ -101,8 +101,11 @@ export const deleteDesignation = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, message: 'Designation not found' });
     }
     res.json({ success: true, message: 'Designation deleted successfully' });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting designation:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    if (error.errno === 1451) {
+      return res.status(400).json({ success: false, message: 'Cannot delete this designation because it is currently in use by one or more employees or system records.' });
+    }
+    res.status(500).json({ success: false, message: 'Failed to delete designation' });
   }
 };

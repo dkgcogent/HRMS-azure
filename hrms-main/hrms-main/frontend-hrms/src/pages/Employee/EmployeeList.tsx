@@ -313,6 +313,7 @@ const EmployeeList: React.FC = () => {
               <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                 <TableCell>Employee</TableCell>
                 <TableCell>Employee ID</TableCell>
+                <TableCell>Login Info</TableCell>
                 <TableCell>Contact</TableCell>
                 <TableCell>Department</TableCell>
                 <TableCell>Designation</TableCell>
@@ -340,6 +341,10 @@ const EmployeeList: React.FC = () => {
                     </Box>
                   </TableCell>
                   <TableCell><Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{employee.employeeId}</Typography></TableCell>
+                  <TableCell>
+                    <Typography variant="caption" sx={{ fontFamily: 'monospace', display: 'block' }}>User: {employee.employeeId}</Typography>
+                    <Typography variant="caption" sx={{ fontFamily: 'monospace', display: 'block' }}>Pass: password123</Typography>
+                  </TableCell>
                   <TableCell><Typography variant="body2">{employee.mobile}</Typography></TableCell>
                   <TableCell><Typography variant="body2">{employee.departmentName}</Typography></TableCell>
                   <TableCell><Typography variant="body2">{employee.designationName}</Typography></TableCell>

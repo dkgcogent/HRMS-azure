@@ -1,0 +1,1 @@
+const mysql = require("mysql2/promise"); async function run() { const pool = mysql.createPool({host: "tmsdatabase.mysql.database.azure.com", user: "tmsdkg", password: "Test@123", database: "tmsdatabase", ssl: { rejectUnauthorized: false }}); const [rows] = await pool.query("SHOW TABLES LIKE \"%kpi%\""); console.log(rows); process.exit(0); } run();

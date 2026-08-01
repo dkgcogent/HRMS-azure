@@ -17,7 +17,6 @@ import {
   alpha,
   InputBase,
   Paper,
-  Button,
   Tooltip,
   Divider,
   CircularProgress,
@@ -27,10 +26,10 @@ import {
   NavigateNext as NavigateNextIcon,
   Notifications as NotificationsIcon,
   Search as SearchIcon,
-  List as ListIcon,
+
   DoneAll as DoneAllIcon,
-  Cake as CakeIcon,
-  NotificationImportant as NotificationImportantIcon,
+  Menu as MenuIcon,
+  MenuOpen as MenuOpenIcon,
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -48,7 +47,12 @@ interface BellNotification {
   isRead: boolean;
 }
 
-const Header: React.FC = () => {
+interface HeaderProps {
+  onToggleSidebar?: () => void;
+  sidebarOpen?: boolean;
+}
+
+const Header: React.FC<HeaderProps> = ({ onToggleSidebar, sidebarOpen = true }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -67,7 +71,8 @@ const Header: React.FC = () => {
         setNotifications(response.data || []);
       }
     } catch (error) {
-      console.error('Error fetching bell notifications:', error);
+      // Background notification polling failure handled silently
+      setNotifications([]);
     } finally {
       setLoadingNotifications(false);
     }
@@ -213,6 +218,21 @@ const Header: React.FC = () => {
       }}
     >
       <Toolbar sx={{ px: 3, py: 2 }}>
+        <Tooltip title={sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}>
+          <IconButton
+            onClick={onToggleSidebar}
+            edge="start"
+            sx={{
+              mr: 2,
+              color: 'text.secondary',
+              '&:hover': {
+                backgroundColor: alpha('#667eea', 0.08),
+              },
+            }}
+          >
+            {sidebarOpen ? <MenuOpenIcon /> : <MenuIcon />}
+          </IconButton>
+        </Tooltip>
         <Box sx={{ flexGrow: 1 }}>
           <Typography
             variant="h5"
@@ -274,26 +294,7 @@ const Header: React.FC = () => {
         </Paper>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {/* KPI List Button for Admin */}
-          {(user?.role === 'admin' || user?.role === 'manager') && (
-            <Button
-              variant="outlined"
-              startIcon={<ListIcon />}
-              onClick={() => navigate('/performance/kpi-list')}
-              sx={{
-                mr: 1,
-                textTransform: 'none',
-                borderColor: alpha('#667eea', 0.3),
-                color: '#667eea',
-                '&:hover': {
-                  borderColor: '#667eea',
-                  backgroundColor: alpha('#667eea', 0.08),
-                },
-              }}
-            >
-              KPI List
-            </Button>
-          )}
+
 
           {/* Notifications */}
           <IconButton

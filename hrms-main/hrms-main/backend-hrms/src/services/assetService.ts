@@ -16,7 +16,7 @@ export interface Asset {
   currentValue?: number;
   vendorName?: string;
   invoiceNumber?: string;
-  depreciationMethod?: 'STRAIGHT_LINE' | 'PERCENTAGE';
+  depreciationMethod?: 'STRAIGHT_LINE' | 'DECLINING_BALANCE';
   depreciationRate?: number;
   usefulLifeYears?: number;
   condition: 'EXCELLENT' | 'GOOD' | 'FAIR' | 'POOR' | 'DAMAGED';
@@ -102,7 +102,7 @@ export async function generateAssetId(): Promise<string> {
 export function calculateDepreciation(
   purchasePrice: number,
   purchaseDate: string,
-  depreciationMethod: 'STRAIGHT_LINE' | 'PERCENTAGE',
+  depreciationMethod: 'STRAIGHT_LINE' | 'DECLINING_BALANCE' | 'NONE',
   depreciationRate: number,
   usefulLifeYears: number,
   currentDate: Date = new Date()

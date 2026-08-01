@@ -12,7 +12,8 @@ import {
   getPayslipById,
   createPayslip,
   updatePayslip,
-  deletePayslip
+  deletePayslip,
+  getPayslipsByEmployee
 } from '../controllers/payslipController';
 import { generatePayslipPdf } from '../utils/payslipPdfGenerator';
 
@@ -28,6 +29,7 @@ router.put('/employee-salary', updateEmployeeSalary); // Use PUT for upsert
 
 // Payslip Routes
 router.get('/', getAllPayslips);
+router.get('/employee/:employeeId', getPayslipsByEmployee);
 router.get('/:id', getPayslipById);
 router.get('/:id/pdf', (req, res) => generatePayslipPdf(parseInt(req.params.id), res));
 router.post('/', createPayslip);

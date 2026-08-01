@@ -99,8 +99,6 @@ async function seedDemoUsers() {
 
   const hash = (pwd: string) => bcrypt.hashSync(pwd, 10);
   const users = [
-    ['employee1', 'Employee One', 'employee', hash('emp123'), null, null],
-    ['hr1', 'HR One', 'hr', hash('hr123'), null, null],
     ['admin', 'Admin User', 'admin', hash('admin123'), null, null],
   ];
   await pool.query(

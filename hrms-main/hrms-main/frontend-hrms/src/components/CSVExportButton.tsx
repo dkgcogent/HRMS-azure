@@ -4,7 +4,7 @@ import { FileDownload } from '@mui/icons-material';
 import { apiService } from '../services/api';
 
 interface CSVExportButtonProps {
-  exportType: 'KPI' | 'ASSETS' | 'LEAVE' | 'EXPENSE';
+  exportType: 'ASSETS' | 'LEAVE' | 'EXPENSE';
   fileName?: string;
   variant?: 'contained' | 'outlined' | 'text';
   size?: 'small' | 'medium' | 'large';
@@ -33,10 +33,7 @@ const CSVExportButton: React.FC<CSVExportButtonProps> = ({
       let defaultFileName: string;
 
       switch (exportType) {
-        case 'KPI':
-          blob = await apiService.exportKPIToCSV();
-          defaultFileName = `KPI_Export_${new Date().toISOString().split('T')[0]}.csv`;
-          break;
+
         case 'ASSETS':
           blob = await apiService.exportAssetsToCSV();
           defaultFileName = `Assets_Export_${new Date().toISOString().split('T')[0]}.csv`;

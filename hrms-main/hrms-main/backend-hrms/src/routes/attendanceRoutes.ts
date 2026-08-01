@@ -19,7 +19,8 @@ import {
   getPendingManualRequests,
   getPendingRegularizationRequests,
   gpsMark,
-  getMonthlyStats
+  getMonthlyStats,
+  getAttendanceRangeStats
 } from '../controllers/attendanceController';
 import { authenticateToken, authorizeRoles } from '../middleware/auth';
 
@@ -30,6 +31,8 @@ router.use(authenticateToken);
 
 // Employee endpoints
 router.get('/employee-stats/:employeeId/:year/:month', authorizeRoles('hr', 'admin'), getMonthlyStats);
+router.get('/employee-range-stats/:employeeId', authorizeRoles('hr', 'admin'), getAttendanceRangeStats);
+
 router.post('/mark', authorizeRoles('employee', 'hr', 'admin'), markAttendance);                  // alias
 router.post('/auto-login', authorizeRoles('employee', 'hr', 'admin'), autoClockIn);              // alias
 router.post('/gps-mark', authorizeRoles('employee', 'hr', 'admin'), gpsMark);                    // alias

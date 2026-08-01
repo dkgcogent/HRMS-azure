@@ -33,10 +33,18 @@ import PayrollForm from './pages/Payroll/PayrollForm';
 import PayslipList from './pages/Payroll/PayslipList';
 import PerformanceForm from './pages/Performance/PerformanceForm';
 import AppraisalManagementForm from './pages/Performance/AppraisalManagementForm';
-import ManagerKPIReview from './pages/Performance/ManagerKPIReview';
-import HRKPIReview from './pages/Performance/HRKPIReview';
-import CreateKPIForm from './pages/Performance/CreateKPIForm';
-import KPIList from './pages/Performance/KPIList';
+
+import KRADashboard from './pages/KRA/KRADashboard';
+import KRATemplateList from './pages/KRA/KRATemplateList';
+import KRATemplateForm from './pages/KRA/KRATemplateForm';
+import KRAAssignment from './pages/KRA/KRAAssignment';
+import KRAImport from './pages/KRA/KRAImport';
+import KRAExport from './pages/KRA/KRAExport';
+import KRAVersionHistory from './pages/KRA/KRAVersionHistory';
+import KRAAuditLogs from './pages/KRA/KRAAuditLogs';
+import MyKRA from './pages/KRA/MyKRA';
+import KRAView from './pages/KRA/KRAView';
+
 import TrainingProgramForm from './pages/Training/TrainingProgramForm';
 import TrainingEnrollmentForm from './pages/Training/TrainingEnrollmentForm';
 import TrainingManagementForm from './pages/Training/TrainingManagementForm';
@@ -70,16 +78,40 @@ import { HRTaskDashboard } from './pages/Tasks/HRTaskDashboard';
 import { AdminTaskDashboard } from './pages/Tasks/AdminTaskDashboard';
 import { TaskDetailPage } from './pages/Tasks/TaskDetailPage';
 import { CreateTaskPage } from './pages/Tasks/CreateTaskPage';
+import MyPayslips from './pages/SelfService/MyPayslips';
 import ProfileUpdateForm from './pages/SelfService/ProfileUpdateForm';
 import './App.css';
 
 const MainLayout: React.FC = () => {
+  const [sidebarOpen, setSidebarOpen] = React.useState<boolean>(() => {
+    const saved = localStorage.getItem('sidebarOpen');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+
+  const toggleSidebar = () => {
+    setSidebarOpen((prev: boolean) => {
+      const next = !prev;
+      localStorage.setItem('sidebarOpen', JSON.stringify(next));
+      return next;
+    });
+  };
+
   return (
-    <Box sx={{ display: 'flex' }}>
-      <Sidebar />
-      <Box component="main" sx={{ flexGrow: 1, bgcolor: 'background.default' }}>
-        <Header />
-        <Box sx={{ p: 3 }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', maxWidth: '100vw', overflowX: 'hidden' }}>
+      <Sidebar open={sidebarOpen} onToggle={toggleSidebar} />
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          bgcolor: 'background.default',
+          minWidth: 0,
+          maxWidth: sidebarOpen ? 'calc(100vw - 280px)' : '100vw',
+          overflowX: 'hidden',
+          transition: 'all 0.2s ease-in-out',
+        }}
+      >
+        <Header onToggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
+        <Box sx={{ p: 3, maxWidth: '100%', overflowX: 'hidden' }}>
           <Outlet />
         </Box>
       </Box>
@@ -134,12 +166,26 @@ function App() {
               <Route path="/performance/appraisals" element={<AppraisalManagementForm />} />
               <Route path="/performance/appraisals/new" element={<AppraisalManagementForm />} />
               <Route path="/performance/appraisals/edit/:id" element={<AppraisalManagementForm />} />
-              <Route path="/performance/kpi/create" element={<CreateKPIForm />} />
-              <Route path="/performance/kpi/:id" element={<CreateKPIForm />} />
-              <Route path="/performance/kpi/edit/:id" element={<CreateKPIForm />} />
-              <Route path="/performance/kpi-list" element={<KPIList />} />
-              <Route path="/performance/hr-review" element={<HRKPIReview />} />
-              <Route path="/performance/manager-review" element={<ManagerKPIReview />} />
+
+              {/* KRA Management */}
+              <Route
+                path="/my-kra"
+                element={
+                  <RoleRoute roles={['employee']}>
+                    <MyKRA />
+                  </RoleRoute>
+                }
+              />
+              <Route path="/kra/dashboard" element={<KRADashboard />} />
+              <Route path="/kra/templates" element={<KRATemplateList />} />
+              <Route path="/kra/templates/view/:id" element={<KRAView />} />
+              <Route path="/kra/templates/new" element={<KRATemplateForm />} />
+              <Route path="/kra/templates/edit/:id" element={<KRATemplateForm />} />
+              <Route path="/kra/assign" element={<KRAAssignment />} />
+              <Route path="/kra/import" element={<KRAImport />} />
+              <Route path="/kra/export" element={<KRAExport />} />
+              <Route path="/kra/history/:id" element={<KRAVersionHistory />} />
+              <Route path="/kra/audit-logs" element={<KRAAuditLogs />} />
 
               {/* Training */}
               <Route path="/training" element={<TrainingManagementForm />} />
@@ -201,6 +247,16 @@ function App() {
                 element={
                   <RoleRoute roles={['hr', 'admin']}>
                     <EmployeeAttendance />
+                  </RoleRoute>
+                }
+              />
+
+              {/* Self Service */}
+              <Route
+                path="/my-payslips"
+                element={
+                  <RoleRoute roles={['employee', 'hr']}>
+                    <MyPayslips />
                   </RoleRoute>
                 }
               />

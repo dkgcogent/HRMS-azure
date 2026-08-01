@@ -4,7 +4,7 @@ import { Download, PictureAsPdf } from '@mui/icons-material';
 import { apiService } from '../services/api';
 
 interface PDFDownloadButtonProps {
-  moduleType: 'KPI' | 'ASSET' | 'LEAVE' | 'EXPENSE';
+  moduleType: 'ASSET' | 'LEAVE' | 'EXPENSE';
   recordId: number;
   fileName?: string;
   variant?: 'contained' | 'outlined' | 'text';
@@ -33,10 +33,7 @@ const PDFDownloadButton: React.FC<PDFDownloadButtonProps> = ({
       let defaultFileName: string;
 
       switch (moduleType) {
-        case 'KPI':
-          blob = await apiService.downloadKPIPDF(recordId);
-          defaultFileName = `KPI_Report_${recordId}.pdf`;
-          break;
+
         case 'ASSET':
           blob = await apiService.downloadAssetPDF(recordId);
           defaultFileName = `Asset_Report_${recordId}.pdf`;

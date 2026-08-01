@@ -16,16 +16,32 @@ import {
   Divider,
   Alert,
   Snackbar,
-  FormControlLabel,
-  Switch,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  LinearProgress,
+  Chip,
+  Tooltip,
+  IconButton,
+  CircularProgress,
 } from '@mui/material';
 import {
   Save as SaveIcon,
   Cancel as CancelIcon,
+  PlayArrow as PlayArrowIcon,
+  PictureAsPdf as PictureAsPdfIcon,
+  Visibility as ViewIcon,
+  Download as DownloadIcon,
+  CheckCircle as CheckCircleIcon,
+  Error as ErrorIcon,
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiService, API_BASE_URL } from '../../services/api';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
 
 interface PayrollRecord {
   id?: number;
@@ -78,22 +94,37 @@ interface PayrollRecord {
   totalCtc: number;
 }
 
+interface BatchRecord {
+  employeeId: number;
+  employeeCode: string;
+  employeeName: string;
+  department: string;
+  designation: string;
+  workingDays: number;
+  presentDays: number;
+  grossSalary: number;
+  totalDeductions: number;
+  netSalary: number;
+  payrollStatus: string;
+  payslipId?: number;
+  payslipGenerated?: boolean;
+  error?: string;
+  payrollPayload?: any;
+}
+
+interface SummaryStats {
+  totalEmployees: number;
+  payrollGenerated: number;
+  payslipsGenerated: number;
+  failedCount: number;
+  completed: boolean;
+}
+
 const PayrollForm: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEdit = Boolean(id);
 
-  const calculatedFieldSx = {
-    '& .MuiFilledInput-root': {
-      backgroundColor: '#fffde7',
-      '&:hover': {
-        backgroundColor: '#fff9c4',
-      },
-      '&.Mui-focused': {
-        backgroundColor: '#fff9c4',
-      }
-    }
-  };
 
   const [loading, setLoading] = useState(false);
   const [employees, setEmployees] = useState<any[]>([]);
@@ -103,24 +134,84 @@ const PayrollForm: React.FC = () => {
     severity: 'success' as 'success' | 'error' | 'warning'
   });
 
+  // Bulk Generation Date Range & Batch State
+  const today = new Date();
+  const firstDayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const lastDayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`;
+
+  const [fromDate, setFromDate] = useState<string>(() => sessionStorage.getItem('bulkPayroll_fromDate') || firstDayStr);
+  const [toDate, setToDate] = useState<string>(() => sessionStorage.getItem('bulkPayroll_toDate') || lastDayStr);
+  const [bulkStatus, setBulkStatus] = useState<'DRAFT' | 'PROCESSED' | 'PAID'>(() => (sessionStorage.getItem('bulkPayroll_bulkStatus') as any) || 'DRAFT');
+
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isGeneratingPayslips, setIsGeneratingPayslips] = useState<boolean>(false);
+  const [progressPercent, setProgressPercent] = useState<number>(0);
+  const [progressText, setProgressText] = useState<string>('');
+
+  const [batchRecords, setBatchRecords] = useState<BatchRecord[]>(() => {
+    const saved = sessionStorage.getItem('bulkPayroll_batchRecords');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [summaryStats, setSummaryStats] = useState<SummaryStats>(() => {
+    const saved = sessionStorage.getItem('bulkPayroll_summaryStats');
+    return saved ? JSON.parse(saved) : {
+      totalEmployees: 0,
+      payrollGenerated: 0,
+      payslipsGenerated: 0,
+      failedCount: 0,
+      completed: false,
+    };
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem('bulkPayroll_fromDate', fromDate);
+    sessionStorage.setItem('bulkPayroll_toDate', toDate);
+    sessionStorage.setItem('bulkPayroll_bulkStatus', bulkStatus);
+    sessionStorage.setItem('bulkPayroll_batchRecords', JSON.stringify(batchRecords));
+    sessionStorage.setItem('bulkPayroll_summaryStats', JSON.stringify(summaryStats));
+  }, [fromDate, toDate, bulkStatus, batchRecords, summaryStats]);
+
+  const handleExportExcel = () => {
+    if (batchRecords.length === 0) {
+      setSnackbar({
+        open: true,
+        message: 'No records to export',
+        severity: 'warning'
+      });
+      return;
+    }
+
+    const exportData = batchRecords.map(record => ({
+      'Employee ID': record.employeeId,
+      'Employee Code': record.employeeCode,
+      'Employee Name': record.employeeName,
+      'Department': record.department,
+      'Designation': record.designation,
+      'Working Days': record.workingDays,
+      'Present Days': record.presentDays,
+      'Gross Salary': record.grossSalary,
+      'Total Deductions': record.totalDeductions,
+      'Net Salary': record.netSalary,
+      'Payroll Status': record.payrollStatus
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Payroll Summary");
+    
+    // Generate excel file and download
+    XLSX.writeFile(workbook, `Payroll_Summary_${Date.now()}.xlsx`);
+  };
+
+  // Single-employee payroll state for Edit mode
   const [payroll, setPayroll] = useState<PayrollRecord>({
     employeeId: 0,
-    month: new Date().toISOString().slice(0, 7), // YYYY-MM format
+    month: new Date().toISOString().slice(0, 7),
     year: new Date().getFullYear(),
     basicSalary: 0,
-    allowances: {
-      hra: 0,
-      transport: 0,
-      medical: 0,
-      other: 0,
-      advanceBonus: 0,
-    },
-    deductions: {
-      pf: 0,
-      esi: 0,
-      tax: 0,
-      other: 0,
-    },
+    allowances: { hra: 0, transport: 0, medical: 0, other: 0, advanceBonus: 0 },
+    deductions: { pf: 0, esi: 0, tax: 0, other: 0 },
     grossSalary: 0,
     totalDeductions: 0,
     netSalary: 0,
@@ -130,8 +221,6 @@ const PayrollForm: React.FC = () => {
     calculationBasis: 'Old Basis',
     esicCovered: 'No',
     baseGrossSalary: 29057,
-
-    // Base salary break-up calculator inputs (White cells)
     baseBasic: 0,
     baseHra: 0,
     baseOther: 0,
@@ -142,8 +231,6 @@ const PayrollForm: React.FC = () => {
     lwfSelf: 0,
     lwfCompany: 0,
     usePfCap: false,
-
-    // Employer calculations (Section III)
     emrPf: 0,
     emrEsic: 0,
     emrGratuity: 0,
@@ -160,7 +247,7 @@ const PayrollForm: React.FC = () => {
   }, [isEdit, id]);
 
   useEffect(() => {
-    if (payroll.employeeId && payroll.month) {
+    if (isEdit && payroll.employeeId && payroll.month) {
       const [yearStr, monthStr] = payroll.month.split('-');
       const year = parseInt(yearStr, 10);
       const month = parseInt(monthStr, 10);
@@ -181,10 +268,12 @@ const PayrollForm: React.FC = () => {
       };
       fetchAttendance();
     }
-  }, [payroll.employeeId, payroll.month]);
+  }, [isEdit, payroll.employeeId, payroll.month]);
 
   useEffect(() => {
-    calculateSalary();
+    if (isEdit) {
+      calculateSalary();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     payroll.workingDays,
@@ -204,14 +293,11 @@ const PayrollForm: React.FC = () => {
 
   const loadEmployees = async () => {
     try {
-      const response = await apiService.getEmployees(0, 100);
+      const response = await apiService.getEmployees(1, 1000);
       setEmployees(response.data?.content || []);
     } catch (error) {
       console.error('Error loading employees:', error);
-      setEmployees([
-        { id: 1, firstName: 'John', lastName: 'Doe', employeeId: 'EMP001' },
-        { id: 2, firstName: 'Jane', lastName: 'Smith', employeeId: 'EMP002' },
-      ]);
+      setEmployees([]);
     }
   };
 
@@ -227,7 +313,7 @@ const PayrollForm: React.FC = () => {
           employeeId: data.employee_id,
           month: `${data.year}-${monthStr}`,
           year: data.year,
-          baseGrossSalary: data.gross_salary, // Assume base = gross for simple edit
+          baseGrossSalary: data.gross_salary,
           grossSalary: data.gross_salary,
           netSalary: data.net_salary,
           basicSalary: data.gross_salary,
@@ -242,20 +328,34 @@ const PayrollForm: React.FC = () => {
     }
   };
 
-  const calculateSalary = () => {
-    const ratio = payroll.workingDays > 0 ? (payroll.presentDays / payroll.workingDays) : 0;
+  // Salary calculation formula (Reused exactly across single and bulk workflows)
+  const computeSalaryForEmployee = (
+    workingDays: number,
+    presentDays: number,
+    salStructure: {
+      baseBasic: number;
+      baseHra: number;
+      baseOther: number;
+      baseBonus: number;
+      baseLeave: number;
+      baseAdvance: number;
+      pTax: number;
+      lwfSelf: number;
+      lwfCompany: number;
+      usePfCap: boolean;
+      esicCovered: string;
+      calculationBasis?: string;
+    }
+  ) => {
+    const ratio = workingDays > 0 ? (presentDays / workingDays) : 0;
 
-    const baseBasic = Number(payroll.baseBasic) || 0;
-    const baseHra = Number(payroll.baseHra) || 0;
-    const baseOther = Number(payroll.baseOther) || 0;
-    const baseBonus = Number(payroll.baseBonus) || 0;
-    const baseLeave = Number(payroll.baseLeave) || 0;
-    const baseAdvance = Number(payroll.baseAdvance) || 0;
-    const pTax = Number(payroll.pTax) || 0;
-    const lwfSelf = Number(payroll.lwfSelf) || 0;
-    const lwfCompany = Number(payroll.lwfCompany) || 0;
+    const baseBasic = Number(salStructure.baseBasic) || 0;
+    const baseHra = Number(salStructure.baseHra) || 0;
+    const baseOther = Number(salStructure.baseOther) || 0;
+    const baseBonus = Number(salStructure.baseBonus) || 0;
+    const baseLeave = Number(salStructure.baseLeave) || 0;
+    const baseAdvance = Number(salStructure.baseAdvance) || 0;
 
-    // Pro-rate based on attendance (Requirement 4)
     const proBasic = Math.round(baseBasic * ratio);
     const proHra = Math.round(baseHra * ratio);
     const proOther = Math.round(baseOther * ratio);
@@ -264,37 +364,50 @@ const PayrollForm: React.FC = () => {
     const proAdvance = Math.round(baseAdvance * ratio);
     const proGross = proBasic + proHra + proOther + proBonus + proLeave + proAdvance;
 
-    // Employee Deductions (Section II)
-    // PF Capped logic: If Basic Earned > 15000: PF = 1800. Else 12% (Requirement 5)
+    // Employee Deductions
     let emyPF = 0;
-    if (payroll.usePfCap) {
-      emyPF = proBasic > 15000 ? 1800 : Math.round(proBasic * 0.12);
-    } else {
-      emyPF = Math.round(proBasic * 0.12);
+    if (proGross > 0) {
+      if (salStructure.usePfCap) {
+        emyPF = proBasic > 15000 ? 1800 : Math.round(proBasic * 0.12);
+      } else {
+        emyPF = Math.round(proBasic * 0.12);
+      }
     }
 
-    // ESI Capped logic: If ESIC enabled AND Gross Salary < 21001 (Requirement 6)
-    const emyESIC = (payroll.esicCovered === 'Yes' && proGross < 21001) ? Math.round(proGross * 0.0075) : 0;
+    const emyESIC = (proGross > 0 && salStructure.esicCovered === 'Yes' && proGross < 21001) ? Math.round(proGross * 0.0075) : 0;
+
+    // Fixed deductions (P.Tax and LWF) apply ONLY if there are positive gross earnings (proGross > 0)
+    let rawPTax = proGross > 0 ? Number(salStructure.pTax) || 0 : 0;
+    if (rawPTax > 200) rawPTax = 200; // Cap monthly P.Tax at statutory max 200
+    const pTax = rawPTax;
+
+    let rawLwfSelf = proGross > 0 ? Number(salStructure.lwfSelf) || 0 : 0;
+    if (rawLwfSelf > 25) rawLwfSelf = 10; // Cap monthly LWF at 10
+    const lwfSelf = rawLwfSelf;
+
+    let rawLwfCompany = proGross > 0 ? Number(salStructure.lwfCompany) || 0 : 0;
+    if (rawLwfCompany > 50) rawLwfCompany = 20; // Cap monthly LWF Employer at 20
+    const lwfCompany = rawLwfCompany;
 
     const totalDeductions = emyPF + emyESIC + pTax + lwfSelf;
-    const netSalary = Math.round(proGross - totalDeductions);
+    const netSalary = Math.max(0, Math.round(proGross - totalDeductions));
 
-    // Employer Contributions (Section III / Requirement 10)
-    let emrPF = 0;
-    if (payroll.usePfCap) {
-      emrPF = proBasic > 15000 ? 1950 : Math.round(proBasic * 0.13); // includes Employer PF (12%) and PF Admin (1%)
-    } else {
-      emrPF = Math.round(proBasic * 0.13);
+    let emrPf = 0;
+    if (proGross > 0) {
+      if (salStructure.usePfCap) {
+        emrPf = proBasic > 15000 ? 1950 : Math.round(proBasic * 0.13);
+      } else {
+        emrPf = Math.round(proBasic * 0.13);
+      }
     }
 
-    const emrESIC = (payroll.esicCovered === 'Yes' && proGross < 21001) ? Math.round(proGross * 0.0325) : 0;
-    const gratuity = Math.round(proBasic * 15 / 26 / 12); // Requirement 7
+    const emrEsic = (proGross > 0 && salStructure.esicCovered === 'Yes' && proGross < 21001) ? Math.round(proGross * 0.0325) : 0;
+    const gratuity = proGross > 0 ? Math.round(proBasic * 15 / 26 / 12) : 0;
 
-    const companyAdditionalCost = emrPF + emrESIC + gratuity + lwfCompany;
+    const companyAdditionalCost = emrPf + emrEsic + gratuity + lwfCompany;
     const totalCtc = proGross + companyAdditionalCost;
 
-    setPayroll(prev => ({
-      ...prev,
+    return {
       basicSalary: proBasic,
       allowances: {
         hra: proHra,
@@ -310,93 +423,205 @@ const PayrollForm: React.FC = () => {
         other: lwfSelf,
       },
       grossSalary: proGross,
-      totalDeductions: totalDeductions,
-      netSalary: netSalary,
-      emrPf: emrPF,
-      emrEsic: emrESIC,
+      totalDeductions,
+      netSalary,
+      emrPf,
+      emrEsic,
       emrGratuity: gratuity,
       emrLwf: lwfCompany,
       companyAdditionalCost,
       totalCtc,
+      baseBasic,
+      baseHra,
+      baseOther,
+      baseBonus,
+      baseLeave,
+      baseAdvance,
+      pTax: Number(salStructure.pTax) || 0,
+      lwfSelf: Number(salStructure.lwfSelf) || 0,
+      lwfCompany: Number(salStructure.lwfCompany) || 0,
+      usePfCap: salStructure.usePfCap,
+      esicCovered: salStructure.esicCovered,
+      calculationBasis: salStructure.calculationBasis || 'Old Basis'
+    };
+  };
+
+  const calculateSalary = () => {
+    const calc = computeSalaryForEmployee(payroll.workingDays, payroll.presentDays, {
+      baseBasic: payroll.baseBasic,
+      baseHra: payroll.baseHra,
+      baseOther: payroll.baseOther,
+      baseBonus: payroll.baseBonus,
+      baseLeave: payroll.baseLeave,
+      baseAdvance: payroll.baseAdvance,
+      pTax: payroll.pTax,
+      lwfSelf: payroll.lwfSelf,
+      lwfCompany: payroll.lwfCompany,
+      usePfCap: payroll.usePfCap,
+      esicCovered: payroll.esicCovered,
+      calculationBasis: payroll.calculationBasis
+    });
+
+    setPayroll(prev => ({
+      ...prev,
+      ...calc
     }));
   };
 
-  const handleInputChange = (field: string, value: any) => {
-    if (field.includes('.')) {
-      const [parent, child] = field.split('.');
-      setPayroll(prev => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent],
-          [child]: parseFloat(value) || 0,
-        },
-      }));
-    } else {
-      setPayroll(prev => ({
-        ...prev,
-        [field]: field === 'employeeId' || field === 'workingDays' || field === 'presentDays'
-          ? parseInt(value) || 0
-          : field === 'basicSalary'
-            ? parseFloat(value) || 0
-            : value,
-      }));
-    }
-  };
+  // Helper to load salary structure from appointment letter, offer letter, or employee record
+  const fetchEmployeeSalaryStructure = async (emp: any) => {
+    const employeeId = emp.id;
+    const firstName = emp.firstName ? emp.firstName.trim() : '';
 
-  const handleEmployeeChange = async (employeeId: number) => {
-    setPayroll(prev => ({ ...prev, employeeId }));
-
+    // 1. Try Appointment Letter by employee_id or candidate_name
     try {
-      // Query the employee's appointment letters
-      const response = await axios.get(`${API_BASE_URL}/api/appointment-letters/my-letters/${employeeId}`);
-      if (response.data.success && response.data.data && response.data.data.length > 0) {
-        // Take the latest appointment letter
-        const latestLetter = response.data.data[0];
-        
-        // Fetch full letter details to get appointment_data
-        const detailsResponse = await axios.get(`${API_BASE_URL}/api/appointment-letters/${latestLetter.id}`);
+      const myRes = await axios.get(`${API_BASE_URL}/api/appointment-letters/my-letters/${employeeId}`);
+      let targetLetterId: number | null = null;
+      let letterDetailsData: any = null;
+
+      if (myRes.data.success && myRes.data.data && myRes.data.data.length > 0) {
+        targetLetterId = myRes.data.data[0].id;
+      } else {
+        const listRes = await axios.get(`${API_BASE_URL}/api/appointment-letters/list`);
+        if (listRes.data.success && Array.isArray(listRes.data.data)) {
+          const matched = listRes.data.data.find((l: any) => 
+            (l.employee_id && Number(l.employee_id) === Number(employeeId)) ||
+            (l.candidate_name && firstName && l.candidate_name.toLowerCase().includes(firstName.toLowerCase()))
+          );
+          if (matched) {
+            targetLetterId = matched.id;
+          }
+        }
+      }
+
+      if (targetLetterId) {
+        const detailsResponse = await axios.get(`${API_BASE_URL}/api/appointment-letters/${targetLetterId}`);
         if (detailsResponse.data.success && detailsResponse.data.data) {
-          const letterDetails = detailsResponse.data.data;
-          // Parse appointment_data
-          const offerData = typeof letterDetails.appointment_data === 'string' 
-            ? JSON.parse(letterDetails.appointment_data) 
-            : letterDetails.appointment_data;
+          letterDetailsData = detailsResponse.data.data;
+          const offerData = typeof letterDetailsData.appointment_data === 'string' 
+            ? JSON.parse(letterDetailsData.appointment_data) 
+            : (letterDetailsData.appointment_data || {});
           
-          if (offerData) {
-            console.log('Setting payroll data with offerData:', offerData);
-            setPayroll(prev => ({
-              ...prev,
-              baseGrossSalary: Number(offerData.grossSalary) || 0,
-              baseBasic: Number(offerData.basicSalary) || 0,
-              baseHra: Number(offerData.hra) || 0,
-              baseOther: Number(offerData.otherAllowances) || 0,
-              baseBonus: Number(offerData.performanceBonus) || 0,
-              baseLeave: Number(offerData.leaveEncashment) || 0,
-              baseAdvance: Number(offerData.advanceBonus) || 0,
-              pTax: Number(offerData.pTax) || 0,
-              lwfSelf: Number(offerData.lwfEmployee) || 0,
-              lwfCompany: Number(offerData.lwfEmployer) || 0,
-              usePfCap: offerData.usePfCap || false,
+          const baseGross = Number(offerData.grossSalary) || Number(letterDetailsData.monthly_ctc) || Number(offerData.monthlyCTC) || 0;
+          if (baseGross > 0) {
+            const baseBasic = Number(offerData.basicSalary) || Number(offerData.baseBasic) || Math.round(baseGross * 0.5);
+            const baseHra = Number(offerData.hra) || Number(offerData.baseHra) || 0;
+            
+            const baseBonus = Number(offerData.performanceBonus) || Number(offerData.baseBonus) || 0;
+            const baseLeave = Number(offerData.leaveEncashment) || Number(offerData.baseLeave) || 0;
+            const baseAdvance = Number(offerData.advanceBonus) || Number(offerData.baseAdvance) || 0;
+
+            const baseOther = Number(offerData.otherAllowances) || Number(offerData.baseOther) || Math.max(0, baseGross - (baseBasic + baseHra + baseBonus + baseLeave + baseAdvance));
+
+            return {
+              baseGrossSalary: baseGross,
+              baseBasic,
+              baseHra,
+              baseOther,
+              baseBonus,
+              baseLeave,
+              baseAdvance,
+              pTax: Number(offerData.pTax) || (baseGross > 0 ? 200 : 0),
+              lwfSelf: Number(offerData.lwfEmployee) || Number(offerData.lwfSelf) || (baseGross > 0 ? 10 : 0),
+              lwfCompany: Number(offerData.lwfEmployer) || Number(offerData.lwfCompany) || (baseGross > 0 ? 20 : 0),
+              usePfCap: offerData.usePfCap !== undefined ? Boolean(offerData.usePfCap) : true,
               esicCovered: offerData.esicCovered || 'No',
               calculationBasis: offerData.calculationBasis || 'Old Basis'
-            }));
-            
-            setSnackbar({
-              open: true,
-              message: `Loaded salary structure from employee's latest Appointment Letter!`,
-              severity: 'success'
-            });
-            return;
+            };
           }
         }
       }
     } catch (error) {
-      console.warn('Error loading employee salary structure from Appointment Letter:', error);
+      console.warn(`Error loading appointment letter for employee ${employeeId}:`, error);
     }
 
-    // Fallback default values
-    setPayroll(prev => ({
-      ...prev,
+    // 2. Try Offer Letter by employee_id or candidate_name
+    try {
+      const myRes = await axios.get(`${API_BASE_URL}/api/offer-letters/my-letters/${employeeId}`);
+      let targetOfferId: number | null = null;
+      let offerDetailsData: any = null;
+
+      if (myRes.data.success && myRes.data.data && myRes.data.data.length > 0) {
+        targetOfferId = myRes.data.data[0].id;
+      } else {
+        const listRes = await axios.get(`${API_BASE_URL}/api/offer-letters/list`);
+        if (listRes.data.success && Array.isArray(listRes.data.data)) {
+          const matched = listRes.data.data.find((l: any) => 
+            (l.employee_id && Number(l.employee_id) === Number(employeeId)) ||
+            (l.candidate_name && firstName && l.candidate_name.toLowerCase().includes(firstName.toLowerCase()))
+          );
+          if (matched) {
+            targetOfferId = matched.id;
+          }
+        }
+      }
+
+      if (targetOfferId) {
+        const detailsResponse = await axios.get(`${API_BASE_URL}/api/offer-letters/${targetOfferId}`);
+        if (detailsResponse.data.success && detailsResponse.data.data) {
+          offerDetailsData = detailsResponse.data.data;
+          const offerData = typeof offerDetailsData.offer_data === 'string' 
+            ? JSON.parse(offerDetailsData.offer_data) 
+            : (offerDetailsData.offer_data || {});
+          
+          const baseGross = Number(offerData.grossSalary) || Number(offerDetailsData.monthly_ctc) || Number(offerData.monthlyCTC) || 0;
+          if (baseGross > 0) {
+            const baseBasic = Number(offerData.basicSalary) || Number(offerData.baseBasic) || Math.round(baseGross * 0.5);
+            const baseHra = Number(offerData.hra) || Number(offerData.baseHra) || 0;
+            
+            const baseBonus = Number(offerData.performanceBonus) || Number(offerData.baseBonus) || 0;
+            const baseLeave = Number(offerData.leaveEncashment) || Number(offerData.baseLeave) || 0;
+            const baseAdvance = Number(offerData.advanceBonus) || Number(offerData.baseAdvance) || 0;
+
+            const baseOther = Number(offerData.otherAllowances) || Number(offerData.baseOther) || Math.max(0, baseGross - (baseBasic + baseHra + baseBonus + baseLeave + baseAdvance));
+
+            return {
+              baseGrossSalary: baseGross,
+              baseBasic,
+              baseHra,
+              baseOther,
+              baseBonus,
+              baseLeave,
+              baseAdvance,
+              pTax: Number(offerData.pTax) || (baseGross > 0 ? 200 : 0),
+              lwfSelf: Number(offerData.lwfEmployee) || Number(offerData.lwfSelf) || (baseGross > 0 ? 10 : 0),
+              lwfCompany: Number(offerData.lwfEmployer) || Number(offerData.lwfCompany) || (baseGross > 0 ? 20 : 0),
+              usePfCap: offerData.usePfCap !== undefined ? Boolean(offerData.usePfCap) : true,
+              esicCovered: offerData.esicCovered || 'No',
+              calculationBasis: offerData.calculationBasis || 'Old Basis'
+            };
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(`Error loading offer letter for employee ${employeeId}:`, error);
+    }
+
+    // 3. Check employee's own salary column if present in employee record
+    const empSalary = Number(emp.salary) || Number(emp.monthly_ctc) || 0;
+    if (empSalary > 0) {
+      const baseBasic = Math.round(empSalary * 0.5);
+      const baseHra = 0;
+      const baseOther = Math.max(0, empSalary - (baseBasic + baseHra));
+      return {
+        baseGrossSalary: empSalary,
+        baseBasic,
+        baseHra,
+        baseOther,
+        baseBonus: 0,
+        baseLeave: 0,
+        baseAdvance: 0,
+        pTax: 200,
+        lwfSelf: 10,
+        lwfCompany: 20,
+        usePfCap: true,
+        esicCovered: 'No',
+        calculationBasis: 'Old Basis'
+      };
+    }
+
+    // Default to 0 for all salary components if no offer letter / appointment letter / salary exists
+    return {
       baseGrossSalary: 0,
       baseBasic: 0,
       baseHra: 0,
@@ -410,35 +635,327 @@ const PayrollForm: React.FC = () => {
       usePfCap: false,
       esicCovered: 'No',
       calculationBasis: 'Old Basis'
-    }));
+    };
   };
 
-  const validateForm = () => {
-    const errors: string[] = [];
 
-    if (!payroll.employeeId) errors.push('Employee is required');
-    if (!payroll.month) errors.push('Month is required');
-    if (payroll.baseGrossSalary <= 0) errors.push('Base Gross Salary must be greater than 0');
-    if (payroll.workingDays <= 0) errors.push('Working Days must be greater than 0');
-    if (payroll.presentDays < 0) errors.push('Present Days cannot be negative');
-    if (payroll.presentDays > payroll.workingDays) errors.push('Present Days cannot exceed Working Days');
-
-    return errors;
-  };
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    const validationErrors = validateForm();
-    if (validationErrors.length > 0) {
-      setSnackbar({
-        open: true,
-        message: 'Please fix the following errors:\n' + validationErrors.join('\n'),
-        severity: 'error'
-      });
+  // Bulk Payroll Generation handler
+  const handleGenerateBulkPayroll = async () => {
+    if (!fromDate || !toDate) {
+      setSnackbar({ open: true, message: 'Please select both From Date and To Date', severity: 'error' });
       return;
     }
 
+    if (new Date(fromDate) > new Date(toDate)) {
+      setSnackbar({ open: true, message: 'From Date cannot be after To Date', severity: 'error' });
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      setProgressPercent(5);
+      setProgressText('Fetching active employees...');
+      setBatchRecords([]);
+      setSummaryStats({
+        totalEmployees: 0,
+        payrollGenerated: 0,
+        payslipsGenerated: 0,
+        failedCount: 0,
+        completed: false
+      });
+
+      // 1. Fetch active employees
+      const empRes = await apiService.getEmployees(1, 1000);
+      let allEmps: any[] = [];
+      if (empRes.success && empRes.data?.content) {
+        allEmps = empRes.data.content;
+      }
+
+      // Filter active employees
+      const activeEmps = allEmps.filter((e: any) => e.status === 'ACTIVE' || !e.status);
+
+      if (activeEmps.length === 0) {
+        setSnackbar({ open: true, message: 'No active employees found to generate payroll.', severity: 'warning' });
+        setIsProcessing(false);
+        return;
+      }
+
+      // 2. Fetch existing payslips for duplicate handling
+      const payslipRes = await apiService.getPayslips();
+      const existingPayslips: any[] = payslipRes.success && payslipRes.data ? payslipRes.data : [];
+
+      const fromDateObj = new Date(fromDate);
+      const selectedMonth = fromDateObj.getMonth() + 1;
+      const selectedYear = fromDateObj.getFullYear();
+
+      const records: BatchRecord[] = [];
+      let generatedCount = 0;
+      let failedCount = 0;
+
+      // 3. Loop through every employee
+      for (let i = 0; i < activeEmps.length; i++) {
+        const emp = activeEmps[i];
+        const pct = Math.round(((i + 1) / activeEmps.length) * 80) + 10;
+        setProgressPercent(pct);
+        setProgressText(`Processing ${i + 1} of ${activeEmps.length}: ${emp.firstName} ${emp.lastName} (${emp.employeeId || 'EMP-' + emp.id})`);
+
+        try {
+          // Calculate attendance for date range
+          let workingDays = 0;
+          let presentDays = 0;
+
+          const rangeRes = await apiService.getEmployeeAttendanceRangeStats(emp.id, fromDate, toDate);
+          if (rangeRes.success && rangeRes.data) {
+            workingDays = rangeRes.data.workingDays || 0;
+            presentDays = rangeRes.data.presentDays || 0;
+          } else {
+            const start = new Date(fromDate);
+            const end = new Date(toDate);
+            const diffTime = Math.abs(end.getTime() - start.getTime());
+            workingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+            presentDays = 0;
+          }
+
+          // Fetch employee salary structure
+          const salStruct = await fetchEmployeeSalaryStructure(emp);
+
+
+          // Calculate salary components using existing logic
+          const calcRes = computeSalaryForEmployee(workingDays, presentDays, salStruct);
+
+          const payrollDataPayload = {
+            employeeId: emp.id,
+            employeeName: `${emp.firstName} ${emp.lastName}`,
+            fromDate,
+            toDate,
+            month: `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`,
+            year: selectedYear,
+            workingDays,
+            presentDays,
+            status: bulkStatus,
+            baseGrossSalary: salStruct.baseGrossSalary || calcRes.grossSalary,
+            basicSalary: calcRes.basicSalary,
+            allowances: calcRes.allowances,
+            deductions: calcRes.deductions,
+            grossSalary: calcRes.grossSalary,
+            totalDeductions: calcRes.totalDeductions,
+            netSalary: calcRes.netSalary,
+            baseBasic: calcRes.baseBasic,
+            baseHra: calcRes.baseHra,
+            baseOther: calcRes.baseOther,
+            baseBonus: calcRes.baseBonus,
+            baseLeave: calcRes.baseLeave,
+            baseAdvance: calcRes.baseAdvance,
+            pTax: calcRes.pTax,
+            lwfSelf: calcRes.lwfSelf,
+            lwfCompany: calcRes.lwfCompany,
+            usePfCap: calcRes.usePfCap,
+            esicCovered: calcRes.esicCovered,
+            calculationBasis: calcRes.calculationBasis,
+            emrPf: calcRes.emrPf,
+            emrEsic: calcRes.emrEsic,
+            emrGratuity: calcRes.emrGratuity,
+            emrLwf: calcRes.emrLwf,
+            companyAdditionalCost: calcRes.companyAdditionalCost,
+            totalCtc: calcRes.totalCtc,
+          };
+
+          const payslipPayload = {
+            employee_id: emp.id,
+            month: selectedMonth,
+            year: selectedYear,
+            gross_salary: calcRes.grossSalary,
+            net_salary: calcRes.netSalary,
+            payroll_data: payrollDataPayload,
+          };
+
+          // Keep track of existing duplicate but DO NOT save to DB yet (save when Generate Payslip is clicked)
+          const existing = existingPayslips.find(
+            (p: any) => p.employee_id === emp.id && Number(p.month) === selectedMonth && Number(p.year) === selectedYear
+          );
+
+          let createdPayslipId: number | undefined = existing ? existing.id : undefined;
+
+          generatedCount++;
+
+          records.push({
+            employeeId: emp.id,
+            employeeCode: emp.employeeId || `EMP-${emp.id}`,
+            employeeName: `${emp.firstName} ${emp.lastName}`,
+            department: emp.departmentName || emp.department?.name || 'N/A',
+            designation: emp.designationName || emp.designation?.name || 'N/A',
+            workingDays,
+            presentDays,
+            grossSalary: calcRes.grossSalary,
+            totalDeductions: calcRes.totalDeductions,
+            netSalary: calcRes.netSalary,
+            payrollStatus: bulkStatus,
+            payslipId: createdPayslipId,
+            payslipGenerated: false,
+            payrollPayload: payslipPayload
+          });
+
+        } catch (err: any) {
+          console.error(`Failed to generate payroll for employee ${emp.id}:`, err);
+          failedCount++;
+          records.push({
+            employeeId: emp.id,
+            employeeCode: emp.employeeId || `EMP-${emp.id}`,
+            employeeName: `${emp.firstName} ${emp.lastName}`,
+            department: emp.departmentName || emp.department?.name || 'N/A',
+            designation: emp.designationName || emp.designation?.name || 'N/A',
+            workingDays: 0,
+            presentDays: 0,
+            grossSalary: 0,
+            totalDeductions: 0,
+            netSalary: 0,
+            payrollStatus: 'FAILED',
+            error: err.message || 'Failed to generate payroll record'
+          });
+        }
+      }
+
+      setBatchRecords(records);
+      setProgressPercent(100);
+      setProgressText('Payroll generation completed!');
+
+      setSummaryStats({
+        totalEmployees: activeEmps.length,
+        payrollGenerated: generatedCount,
+        payslipsGenerated: 0,
+        failedCount,
+        completed: true
+      });
+
+      setSnackbar({
+        open: true,
+        message: `Bulk payroll generated successfully! ${generatedCount} generated, ${failedCount} failed.`,
+        severity: failedCount === 0 ? 'success' : 'warning'
+      });
+
+    } catch (error: any) {
+      console.error('Error during bulk payroll generation:', error);
+      setSnackbar({ open: true, message: 'Bulk payroll generation failed. Please try again.', severity: 'error' });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Bulk Payslip PDF Generation handler
+  const handleGenerateBulkPayslips = async () => {
+    if (batchRecords.length === 0) {
+      setSnackbar({ open: true, message: 'No payroll records found to generate payslips.', severity: 'warning' });
+      return;
+    }
+
+    const validRecords = batchRecords.filter(r => r.payrollStatus !== 'FAILED');
+    if (validRecords.length === 0) {
+      setSnackbar({ open: true, message: 'No valid payroll records found for payslip PDF generation.', severity: 'warning' });
+      return;
+    }
+
+    try {
+      setIsGeneratingPayslips(true);
+      let payslipsCount = 0;
+      let payslipFailures = 0;
+
+      const updatedRecords = [...batchRecords];
+
+      for (let i = 0; i < updatedRecords.length; i++) {
+        const rec = updatedRecords[i];
+        if (rec.payrollStatus === 'FAILED') continue;
+
+        setProgressText(`Generating Payslip PDF ${i + 1} of ${updatedRecords.length}: ${rec.employeeName}`);
+
+        try {
+          let finalPayslipId = rec.payslipId;
+          if (rec.payrollPayload) {
+            if (finalPayslipId) {
+              await apiService.updatePayslip(finalPayslipId, rec.payrollPayload as any);
+            } else {
+              const createRes = await apiService.createPayslip(rec.payrollPayload as any);
+              finalPayslipId = createRes.id || (createRes.data ? createRes.data.id : undefined);
+              rec.payslipId = finalPayslipId;
+            }
+          }
+
+          if (!finalPayslipId) {
+            throw new Error('No Payslip ID available');
+          }
+
+          const pdfUrl = `${API_BASE_URL}/api/payroll/${finalPayslipId}/pdf`;
+          const res = await fetch(pdfUrl);
+          if (res.ok) {
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Payslip_${rec.employeeName.replace(/\s+/g, '_')}_${rec.month}_${rec.year}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+            
+            rec.payslipGenerated = true;
+            payslipsCount++;
+          } else {
+            rec.payslipGenerated = false;
+            rec.error = rec.error ? `${rec.error}; PDF fetch failed` : 'Payslip PDF generation failed';
+            payslipFailures++;
+          }
+        } catch (err: any) {
+          console.error(`Error generating payslip PDF for ID ${rec.payslipId}:`, err);
+          rec.payslipGenerated = false;
+          rec.error = rec.error ? `${rec.error}; PDF error` : err.message || 'PDF error';
+          payslipFailures++;
+        }
+      }
+
+      setBatchRecords(updatedRecords);
+      setSummaryStats(prev => ({
+        ...prev,
+        payslipsGenerated: payslipsCount,
+        failedCount: prev.failedCount + payslipFailures
+      }));
+
+      setSnackbar({
+        open: true,
+        message: `Payslips generated successfully for ${payslipsCount} employees!`,
+        severity: payslipFailures === 0 ? 'success' : 'warning'
+      });
+    } catch (error: any) {
+      console.error('Error generating bulk payslips:', error);
+      setSnackbar({ open: true, message: 'Error generating payslips.', severity: 'error' });
+    } finally {
+      setIsGeneratingPayslips(false);
+    }
+  };
+
+  const handleViewPdf = (payslipId: number) => {
+    window.open(`${API_BASE_URL}/api/payroll/${payslipId}/pdf`, '_blank');
+  };
+
+  const handleDownloadPdf = async (payslipId: number, empName: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/payroll/${payslipId}/pdf`);
+      if (!res.ok) throw new Error('Failed to fetch PDF');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Payslip_${empName.replace(/\s+/g, '_')}_${payslipId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+    } catch (err) {
+      console.error('Download error:', err);
+      alert('Failed to download PDF.');
+    }
+  };
+
+  const handleSingleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     try {
       setLoading(true);
       const [yearStr, monthStr] = payroll.month.split('-');
@@ -454,9 +971,6 @@ const PayrollForm: React.FC = () => {
       if (isEdit && id) {
         await apiService.updatePayslip(parseInt(id), payslipPayload as any);
         setSnackbar({ open: true, message: 'Payslip updated successfully!', severity: 'success' });
-      } else {
-        await apiService.createPayslip(payslipPayload as any);
-        setSnackbar({ open: true, message: 'Payslip created successfully!', severity: 'success' });
       }
       setTimeout(() => navigate('/payslips'), 1500);
     } catch (error) {
@@ -467,597 +981,447 @@ const PayrollForm: React.FC = () => {
     }
   };
 
-  const handleCancel = () => {
-    navigate('/payslips');
-  };
+  // Render Single-Employee Edit Form
+  if (isEdit) {
+    return (
+      <Box>
+        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mb: 1 }}>
+          Edit Payroll
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          Edit payroll record for employee.
+        </Typography>
+        <Paper elevation={2} sx={{ p: 3 }}>
+          <form onSubmit={handleSingleSubmit}>
+            <Grid container spacing={3}>
+              <Grid size={12}>
+                <Typography variant="h6" gutterBottom>
+                  Basic Information
+                </Typography>
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <FormControl fullWidth required>
+                  <InputLabel id="payroll-employee-label" shrink>Employee</InputLabel>
+                  <Select
+                    labelId="payroll-employee-label"
+                    value={payroll.employeeId || ''}
+                    label="Employee"
+                    disabled
+                  >
+                    {employees.map((employee) => (
+                      <MenuItem key={employee.id} value={employee.id}>
+                        {employee.firstName} {employee.lastName} ({employee.employeeId})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <TextField
+                  fullWidth
+                  label="Month"
+                  type="month"
+                  required
+                  value={payroll.month}
+                  onChange={(e) => setPayroll({ ...payroll, month: e.target.value })}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <FormControl fullWidth>
+                  <InputLabel id="payroll-status-label" shrink>Status</InputLabel>
+                  <Select
+                    labelId="payroll-status-label"
+                    value={payroll.status}
+                    label="Status"
+                    onChange={(e) => setPayroll({ ...payroll, status: e.target.value as any })}
+                  >
+                    <MenuItem value="DRAFT">Draft</MenuItem>
+                    <MenuItem value="PROCESSED">Processed</MenuItem>
+                    <MenuItem value="PAID">Paid</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
 
+              <Grid size={12}>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 3 }}>
+                  <Button variant="outlined" startIcon={<CancelIcon />} onClick={() => navigate('/payslips')}>
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    startIcon={<SaveIcon />}
+                    disabled={loading}
+                    sx={{
+                      background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
+                      color: 'white',
+                    }}
+                  >
+                    {loading ? 'Saving...' : 'Update Payroll'}
+                  </Button>
+                </Box>
+              </Grid>
+            </Grid>
+          </form>
+        </Paper>
+      </Box>
+    );
+  }
+
+  // Render Bulk Payroll & Payslip Generation View
   return (
     <Box>
-      <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mb: 1 }}>
-        {isEdit ? 'Edit Payroll' : 'Generate Payroll'}
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Create or edit payroll records for employees.
-      </Typography>
-      <Paper elevation={2} sx={{ p: 3 }}>
-        <form onSubmit={handleSubmit}>
-          <Grid container spacing={3}>
-            {/* Basic Information */}
-            <Grid size={12}>
-              <Typography variant="h6" gutterBottom>
-                Basic Information
-              </Typography>
-            </Grid>
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <Box>
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+            Bulk Payroll & Payslip Generation
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Generate bulk payroll and payslips for all active employees for the selected Date Range.
+          </Typography>
+        </Box>
+        <Button
+          variant="outlined"
+          color="secondary"
+          onClick={() => navigate('/payslips')}
+          sx={{ fontWeight: 'bold' }}
+        >
+          View Payslip History
+        </Button>
+      </Box>
 
-            <Grid
-              size={{
-                xs: 12,
-                md: 4
-              }}>
-              <FormControl fullWidth required>
-                <InputLabel id="payroll-employee-label" shrink={!!payroll.employeeId || true}>Employee</InputLabel>
-                <Select
-                  labelId="payroll-employee-label"
-                  value={payroll.employeeId || ''}
-                  label="Employee"
-                  onChange={(e) => handleEmployeeChange(parseInt(e.target.value))}
-                  displayEmpty
-                  renderValue={(selected: any) => {
-                    if (!selected || selected === '' || selected === null || selected === undefined) {
-                      return <span style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '0.875rem', display: 'inline-block', overflow: 'visible', textOverflow: 'clip', whiteSpace: 'nowrap', width: '100%' }}>Select Employee</span>;
-                    }
-                    const emp = employees.find(e => e.id === selected);
-                    return <span style={{ color: 'rgba(0, 0, 0, 0.87)', fontSize: '0.875rem', display: 'inline-block', overflow: 'visible', textOverflow: 'clip', whiteSpace: 'nowrap' }}>{emp ? `${emp.firstName} ${emp.lastName} (${emp.employeeId})` : String(selected)}</span>;
-                  }}
-                  sx={{
-                    '& .MuiSelect-select': {
-                      paddingLeft: '20px !important',
-                      paddingRight: '40px !important',
-                      paddingTop: '14px !important',
-                      paddingBottom: '14px !important',
-                      overflow: 'visible !important',
-                      textOverflow: 'clip !important',
-                      whiteSpace: 'nowrap !important',
-                      width: '100% !important',
-                      boxSizing: 'border-box',
-                      '@media (max-width:600px)': {
-                        paddingLeft: '16px !important',
-                        paddingRight: '32px !important',
-                        paddingTop: '10px !important',
-                        paddingBottom: '10px !important',
-                      },
-                    },
-                    '& .MuiSelect-select > span': {
-                      overflow: 'visible !important',
-                      textOverflow: 'clip !important',
-                      whiteSpace: 'nowrap !important',
-                      maxWidth: 'none !important',
-                      width: 'auto !important',
-                    },
-                  }}
-                >
-                  {employees.map((employee) => (
-                    <MenuItem key={employee.id} value={employee.id}>
-                      {employee.firstName} {employee.lastName} ({employee.employeeId})
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
+      {/* Date Range Selection Controls */}
+      <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 2 }}>
+        <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main', mb: 2 }}>
+          Select Date Range for Bulk Processing
+        </Typography>
+        <Grid container spacing={3} alignItems="center">
+          <Grid size={{ xs: 12, md: 4 }}>
+            <TextField
+              fullWidth
+              label="From Date"
+              type="date"
+              required
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              disabled={summaryStats.completed}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <TextField
+              fullWidth
+              label="To Date"
+              type="date"
+              required
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              disabled={summaryStats.completed}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <FormControl fullWidth>
+              <InputLabel id="bulk-status-label" shrink>Payroll Status</InputLabel>
+              <Select
+                labelId="bulk-status-label"
+                value={bulkStatus}
+                label="Payroll Status"
+                onChange={(e) => setBulkStatus(e.target.value as any)}
+                disabled={summaryStats.completed}
+              >
+                <MenuItem value="DRAFT">Draft</MenuItem>
+                <MenuItem value="PROCESSED">Processed</MenuItem>
+                <MenuItem value="PAID">Paid</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
 
-            <Grid
-              size={{
-                xs: 12,
-                md: 4
-              }}>
-              <TextField
-                fullWidth
-                label="Month"
-                type="month"
-                required
-                value={payroll.month}
-                onChange={(e) => handleInputChange('month', e.target.value)}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-
-            <Grid
-              size={{
-                xs: 12,
-                md: 4
-              }}>
-              <FormControl fullWidth>
-                <InputLabel id="payroll-status-label" shrink={!!payroll.status || true}>Status</InputLabel>
-                <Select
-                  labelId="payroll-status-label"
-                  value={payroll.status}
-                  label="Status"
-                  onChange={(e) => handleInputChange('status', e.target.value)}
-                  displayEmpty
-                  renderValue={(selected: any) => {
-                    if (!selected || selected === '') {
-                      return <span style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '0.875rem', display: 'inline-block', overflow: 'visible', textOverflow: 'clip', whiteSpace: 'nowrap', width: '100%' }}>Select Status</span>;
-                    }
-                    const statusLabels: { [key: string]: string } = {
-                      'DRAFT': 'Draft',
-                      'PROCESSED': 'Processed',
-                      'PAID': 'Paid',
-                    };
-                    return <span style={{ color: 'rgba(0, 0, 0, 0.87)', fontSize: '0.875rem', display: 'inline-block', overflow: 'visible', textOverflow: 'clip', whiteSpace: 'nowrap' }}>{statusLabels[selected] || selected}</span>;
-                  }}
-                  sx={{
-                    '& .MuiSelect-select': {
-                      paddingLeft: '20px !important',
-                      paddingRight: '40px !important',
-                      paddingTop: '14px !important',
-                      paddingBottom: '14px !important',
-                      overflow: 'visible !important',
-                      textOverflow: 'clip !important',
-                      whiteSpace: 'nowrap !important',
-                      width: '100% !important',
-                      boxSizing: 'border-box',
-                      '@media (max-width:600px)': {
-                        paddingLeft: '16px !important',
-                        paddingRight: '32px !important',
-                        paddingTop: '10px !important',
-                        paddingBottom: '10px !important',
-                      },
-                    },
-                    '& .MuiSelect-select > span': {
-                      overflow: 'visible !important',
-                      textOverflow: 'clip !important',
-                      whiteSpace: 'nowrap !important',
-                      maxWidth: 'none !important',
-                      width: 'auto !important',
-                    },
-                  }}
-                >
-                  <MenuItem value="DRAFT">Draft</MenuItem>
-                  <MenuItem value="PROCESSED">Processed</MenuItem>
-                  <MenuItem value="PAID">Paid</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-
-            {/* Attendance Information */}
-            <Grid size={12}>
-              <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-                Attendance Information
-              </Typography>
-            </Grid>
-
-            <Grid
-              size={{
-                xs: 12,
-                md: 6
-              }}>
-              <TextField
-                fullWidth
-                label="Working Days"
-                type="number"
-                required
-                value={payroll.workingDays}
-                onChange={(e) => handleInputChange('workingDays', e.target.value)}
-              />
-            </Grid>
-
-            <Grid
-              size={{
-                xs: 12,
-                md: 6
-              }}>
-              <TextField
-                fullWidth
-                label="Present Days"
-                type="number"
-                required
-                value={payroll.presentDays}
-                onChange={(e) => handleInputChange('presentDays', e.target.value)}
-              />
-            </Grid>
-
-            {/* Salary Information Inputs */}
-            <Grid size={12}>
-              <Typography variant="h6" gutterBottom sx={{ mt: 2, color: 'primary.main', fontWeight: 'bold' }}>
-                Base Salary Breakup Structure (Excel Monthly Calculator)
-              </Typography>
-              <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
-                Enter the monthly base components below (white cells). They will be automatically pro-rated based on the employee's attendance. Selecting an employee will attempt to auto-load these values from their latest Offer Letter.
-              </Alert>
-            </Grid>
-
-            {/* Base Basic */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                label="Base Basic Salary"
-                type="number"
-                required
-                value={payroll.baseBasic || ''}
-                onChange={(e) => handleInputChange('baseBasic', parseFloat(e.target.value) || 0)}
-                InputProps={{ startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* Base HRA */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                label="Base HRA"
-                type="number"
-                required
-                value={payroll.baseHra || ''}
-                onChange={(e) => handleInputChange('baseHra', parseFloat(e.target.value) || 0)}
-                InputProps={{ startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* Base Other Allowances */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                label="Base Other Allowances"
-                type="number"
-                value={payroll.baseOther || ''}
-                onChange={(e) => handleInputChange('baseOther', parseFloat(e.target.value) || 0)}
-                InputProps={{ startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* Base Performance Bonus */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                label="Base Performance Bonus"
-                type="number"
-                value={payroll.baseBonus || ''}
-                onChange={(e) => handleInputChange('baseBonus', parseFloat(e.target.value) || 0)}
-                InputProps={{ startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* Base Leave Encashment */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                label="Base Leave Encashment"
-                type="number"
-                value={payroll.baseLeave || ''}
-                onChange={(e) => handleInputChange('baseLeave', parseFloat(e.target.value) || 0)}
-                InputProps={{ startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* Base Advance Bonus */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                label="Base Advance Bonus"
-                type="number"
-                value={payroll.baseAdvance || ''}
-                onChange={(e) => handleInputChange('baseAdvance', parseFloat(e.target.value) || 0)}
-                InputProps={{ startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* Professional Tax */}
-            <Grid size={{ xs: 12, md: 3 }}>
-              <TextField
-                fullWidth
-                label="Professional Tax"
-                type="number"
-                value={payroll.pTax || ''}
-                onChange={(e) => handleInputChange('pTax', parseFloat(e.target.value) || 0)}
-                InputProps={{ startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* LWF Self */}
-            <Grid size={{ xs: 12, md: 3 }}>
-              <TextField
-                fullWidth
-                label="LWF (Self Contribution)"
-                type="number"
-                value={payroll.lwfSelf || ''}
-                onChange={(e) => handleInputChange('lwfSelf', parseFloat(e.target.value) || 0)}
-                InputProps={{ startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* LWF Company */}
-            <Grid size={{ xs: 12, md: 3 }}>
-              <TextField
-                fullWidth
-                label="LWF (Company Contribution)"
-                type="number"
-                value={payroll.lwfCompany || ''}
-                onChange={(e) => handleInputChange('lwfCompany', parseFloat(e.target.value) || 0)}
-                InputProps={{ startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* ESIC Toggle and PF limit switches */}
-            <Grid size={{ xs: 12, md: 3 }} sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <FormControl fullWidth size="small" sx={{ mb: 1 }}>
-                <InputLabel id="payroll-esic-label" shrink>ESIC Covered</InputLabel>
-                <Select
-                  labelId="payroll-esic-label"
-                  value={payroll.esicCovered}
-                  label="ESIC Covered"
-                  onChange={(e) => handleInputChange('esicCovered', e.target.value)}
-                >
-                  <MenuItem value="No">No</MenuItem>
-                  <MenuItem value="Yes">Yes</MenuItem>
-                </Select>
-              </FormControl>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={payroll.usePfCap}
-                    onChange={(e) => handleInputChange('usePfCap', e.target.checked)}
+          <Grid size={12}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-start', mt: 1 }}>
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={isProcessing ? <CircularProgress size={20} color="inherit" /> : <PlayArrowIcon />}
+                disabled={isProcessing || isGeneratingPayslips || summaryStats.completed}
+                onClick={handleGenerateBulkPayroll}
+                sx={{
+                  px: 4,
+                  py: 1.2,
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
+                  boxShadow: '0 4px 12px rgba(30, 60, 114, 0.25)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #152954 0%, #1c3d75 100%)',
+                    boxShadow: '0 6px 16px rgba(30, 60, 114, 0.4)',
+                  }
+                }}
+              >
+                {isProcessing ? 'Processing...' : 'Generate Payroll'}
+              </Button>
+              {summaryStats.completed && (
+                <>
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    onClick={() => {
+                      setBatchRecords([]);
+                      setSummaryStats({
+                        totalEmployees: 0,
+                        payrollGenerated: 0,
+                        payslipsGenerated: 0,
+                        failedCount: 0,
+                        completed: false,
+                      });
+                    }}
+                    sx={{
+                      ml: 2,
+                      px: 4,
+                      py: 1.2,
+                      fontWeight: 'bold',
+                      fontSize: '1rem',
+                    }}
+                  >
+                    Reset Selection
+                  </Button>
+                  <Button
+                    variant="outlined"
                     color="secondary"
-                    size="small"
-                  />
-                }
-                label={<Typography variant="caption" sx={{ fontWeight: 'bold', color: 'text.secondary' }}>Limit PF to 15,000 Basic (Cap)</Typography>}
-              />
-            </Grid>
+                    size="large"
+                    onClick={() => navigate('/payslips')}
+                    sx={{
+                      ml: 2,
+                      px: 4,
+                      py: 1.2,
+                      fontWeight: 'bold',
+                      fontSize: '1rem',
+                    }}
+                  >
+                    View Payslip History
+                  </Button>
+                </>
+              )}
+            </Box>
+          </Grid>
+        </Grid>
 
-            <Grid size={12}>
-              <Divider sx={{ my: 1 }} />
-              <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 'bold' }}>
-                Calculated Attendance-Based Earned Breakup (ratio = {payroll.presentDays} / {payroll.workingDays})
+        {/* Progress Indicator */}
+        {(isProcessing || isGeneratingPayslips) && (
+          <Box sx={{ mt: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+              <Typography variant="body2" color="primary" fontWeight="bold">
+                {progressText}
               </Typography>
-            </Grid>
-
-            {/* Earnings output */}
-            <Grid size={12}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                Earned Earnings (Pro-rated)
+              <Typography variant="body2" color="text.secondary">
+                {progressPercent}%
               </Typography>
-            </Grid>
+            </Box>
+            <LinearProgress variant="determinate" value={progressPercent} sx={{ height: 8, borderRadius: 4 }} />
+          </Box>
+        )}
+      </Paper>
 
-            {/* Earned Basic */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                label="Earned Basic"
-                value={payroll.basicSalary || 0}
-                variant="filled"
-                sx={calculatedFieldSx}
-                InputProps={{ readOnly: true, startAdornment: '₹' }}
-              />
-            </Grid>
+      {/* Summary Cards & Banner */}
+      {summaryStats.completed && (
+        <Box sx={{ mb: 4 }}>
+          <Alert severity={summaryStats.failedCount === 0 ? "success" : "warning"} icon={<CheckCircleIcon fontSize="inherit" />} sx={{ mb: 3, borderRadius: 2 }}>
+            <Typography variant="h6" fontWeight="bold">
+              Payroll Generated Successfully
+            </Typography>
+            <Typography variant="body2">
+              Batch processing executed from <strong>{fromDate}</strong> to <strong>{toDate}</strong>.
+            </Typography>
+          </Alert>
 
-            {/* Earned HRA */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                label="Earned HRA"
-                value={payroll.allowances.hra || 0}
-                variant="filled"
-                sx={calculatedFieldSx}
-                InputProps={{ readOnly: true, startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* Earned Other Allowances */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                label="Earned Other Allowances"
-                value={payroll.allowances.other || 0}
-                variant="filled"
-                sx={calculatedFieldSx}
-                InputProps={{ readOnly: true, startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* Earned Performance Bonus */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                label="Earned Performance Bonus"
-                value={payroll.allowances.transport || 0}
-                variant="filled"
-                sx={calculatedFieldSx}
-                InputProps={{ readOnly: true, startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* Earned Leave Encashment */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                label="Earned Leave Encashment"
-                value={payroll.allowances.medical || 0}
-                variant="filled"
-                sx={calculatedFieldSx}
-                InputProps={{ readOnly: true, startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* Earned Advance Bonus */}
-            <Grid size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
-                label="Earned Advance Bonus"
-                value={payroll.allowances.advanceBonus || 0}
-                variant="filled"
-                sx={calculatedFieldSx}
-                InputProps={{ readOnly: true, startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* Deductions output */}
-            <Grid size={12}>
-              <Typography variant="subtitle1" sx={{ mt: 1, fontWeight: 'bold', color: 'error.main' }}>
-                Deductions (Self Contribution)
-              </Typography>
-            </Grid>
-
-            {/* PF Self */}
-            <Grid size={{ xs: 12, md: 3 }}>
-              <TextField
-                fullWidth
-                label="P.F. Deduction (Self)"
-                value={payroll.deductions.pf || 0}
-                variant="filled"
-                sx={calculatedFieldSx}
-                InputProps={{ readOnly: true, startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* ESI Self */}
-            <Grid size={{ xs: 12, md: 3 }}>
-              <TextField
-                fullWidth
-                label="ESI Deduction (Self)"
-                value={payroll.deductions.esi || 0}
-                variant="filled"
-                sx={calculatedFieldSx}
-                InputProps={{ readOnly: true, startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* PTax */}
-            <Grid size={{ xs: 12, md: 3 }}>
-              <TextField
-                fullWidth
-                label="Professional Tax"
-                value={payroll.deductions.tax || 0}
-                variant="filled"
-                sx={calculatedFieldSx}
-                InputProps={{ readOnly: true, startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* LWF Self */}
-            <Grid size={{ xs: 12, md: 3 }}>
-              <TextField
-                fullWidth
-                label="Labor Welfare Fund (Self)"
-                value={payroll.deductions.other || 0}
-                variant="filled"
-                sx={calculatedFieldSx}
-                InputProps={{ readOnly: true, startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* Employer Contributions output */}
-            <Grid size={12}>
-              <Typography variant="subtitle1" sx={{ mt: 1, fontWeight: 'bold', color: 'success.main' }}>
-                Employer Contributions (Section III)
-              </Typography>
-            </Grid>
-
-            {/* Employer PF */}
-            <Grid size={{ xs: 12, md: 3 }}>
-              <TextField
-                fullWidth
-                label="Employer P.F. (13%)"
-                value={payroll.emrPf || 0}
-                variant="filled"
-                sx={calculatedFieldSx}
-                InputProps={{ readOnly: true, startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* Employer ESI */}
-            <Grid size={{ xs: 12, md: 3 }}>
-              <TextField
-                fullWidth
-                label="Employer ESI (3.25%)"
-                value={payroll.emrEsic || 0}
-                variant="filled"
-                sx={calculatedFieldSx}
-                InputProps={{ readOnly: true, startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* Gratuity */}
-            <Grid size={{ xs: 12, md: 3 }}>
-              <TextField
-                fullWidth
-                label="Gratuity"
-                value={payroll.emrGratuity || 0}
-                variant="filled"
-                sx={calculatedFieldSx}
-                InputProps={{ readOnly: true, startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* Employer LWF */}
-            <Grid size={{ xs: 12, md: 3 }}>
-              <TextField
-                fullWidth
-                label="Employer LWF"
-                value={payroll.emrLwf || 0}
-                variant="filled"
-                sx={calculatedFieldSx}
-                InputProps={{ readOnly: true, startAdornment: '₹' }}
-              />
-            </Grid>
-
-            {/* Summary */}
-            <Grid size={12}>
-              <Card sx={{ mt: 2, background: 'linear-gradient(135deg, rgba(30, 60, 114, 0.05) 0%, rgba(42, 82, 152, 0.05) 100%)', border: '1px solid rgba(30, 60, 114, 0.1)' }}>
-                <CardContent sx={{ p: 3 }}>
-                  <Typography variant="h6" gutterBottom fontWeight="bold" color="primary">
-                    Payroll Sheet Summary
+          <Grid container spacing={3} sx={{ mb: 3 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Card sx={{ background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)', border: '1px solid #90caf9' }}>
+                <CardContent sx={{ p: 2.5 }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight="bold" textTransform="uppercase">
+                    Total Employees
                   </Typography>
-                  <Grid container spacing={3}>
-                    <Grid size={{ xs: 12, md: 3 }}>
-                      <Typography variant="caption" color="text.secondary" display="block">Gross Earned Salary (A)</Typography>
-                      <Typography variant="h6" fontWeight="bold">₹ {payroll.grossSalary.toLocaleString('en-IN')}</Typography>
-                    </Grid>
-                    <Grid size={{ xs: 12, md: 3 }}>
-                      <Typography variant="caption" color="text.secondary" display="block">Gross Deductions (B)</Typography>
-                      <Typography variant="h6" fontWeight="bold" color="error">₹ {payroll.totalDeductions.toLocaleString('en-IN')}</Typography>
-                    </Grid>
-                    <Grid size={{ xs: 12, md: 3 }}>
-                      <Typography variant="caption" color="text.secondary" display="block">Employee Take Home (C = A - B)</Typography>
-                      <Typography variant="h6" fontWeight="bold" color="success.main">₹ {payroll.netSalary.toLocaleString('en-IN')}</Typography>
-                    </Grid>
-                    <Grid size={{ xs: 12, md: 3 }}>
-                      <Typography variant="caption" color="text.secondary" display="block">Total CTC of Company</Typography>
-                      <Typography variant="h6" fontWeight="bold" color="primary.main">₹ {payroll.totalCtc.toLocaleString('en-IN')}</Typography>
-                    </Grid>
-                  </Grid>
+                  <Typography variant="h4" fontWeight="bold" color="primary.main" sx={{ mt: 0.5 }}>
+                    {summaryStats.totalEmployees}
+                  </Typography>
                 </CardContent>
               </Card>
             </Grid>
 
-            <Grid size={12}>
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 3 }}>
-                <Button
-                  variant="outlined"
-                  startIcon={<CancelIcon />}
-                  onClick={handleCancel}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  variant="contained"
-                  startIcon={<SaveIcon />}
-                  disabled={loading}
-                  sx={{
-                    background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
-                    boxShadow: '0 4px 12px rgba(30, 60, 114, 0.2)',
-                    color: 'white',
-                    '&:hover': {
-                      background: 'linear-gradient(135deg, #122548 0%, #1e3c72 100%)',
-                    }
-                  }}
-                >
-                  {loading ? 'Saving...' : isEdit ? 'Update Payroll' : 'Generate Payroll'}
-                </Button>
-              </Box>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Card sx={{ background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)', border: '1px solid #a5d6a7' }}>
+                <CardContent sx={{ p: 2.5 }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight="bold" textTransform="uppercase">
+                    Payroll Generated
+                  </Typography>
+                  <Typography variant="h4" fontWeight="bold" color="success.main" sx={{ mt: 0.5 }}>
+                    {summaryStats.payrollGenerated}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Card sx={{ background: 'linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%)', border: '1px solid #ce93d8' }}>
+                <CardContent sx={{ p: 2.5 }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight="bold" textTransform="uppercase">
+                    Payslips Generated
+                  </Typography>
+                  <Typography variant="h4" fontWeight="bold" color="secondary.main" sx={{ mt: 0.5 }}>
+                    {summaryStats.payslipsGenerated}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <Card sx={{ background: summaryStats.failedCount > 0 ? 'linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%)' : '#fafafa', border: summaryStats.failedCount > 0 ? '1px solid #ef9a9a' : '1px solid #e0e0e0' }}>
+                <CardContent sx={{ p: 2.5 }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight="bold" textTransform="uppercase">
+                    Failed
+                  </Typography>
+                  <Typography variant="h4" fontWeight="bold" color={summaryStats.failedCount > 0 ? "error.main" : "text.secondary"} sx={{ mt: 0.5 }}>
+                    {summaryStats.failedCount}
+                  </Typography>
+                </CardContent>
+              </Card>
             </Grid>
           </Grid>
-        </form>
-      </Paper>
+        </Box>
+      )}
+
+      {/* Payroll Summary Table */}
+      {batchRecords.length > 0 && (
+        <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+              Payroll Summary Table ({batchRecords.length} Employees)
+            </Typography>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<DownloadIcon />}
+              onClick={handleExportExcel}
+              disabled={batchRecords.length === 0}
+              sx={{ borderRadius: 2 }}
+            >
+              Export to Excel
+            </Button>
+          </Box>
+
+          <TableContainer>
+            <Table size="medium">
+              <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                <TableRow>
+                  <TableCell><strong>Employee ID</strong></TableCell>
+                  <TableCell><strong>Employee Code</strong></TableCell>
+                  <TableCell><strong>Employee Name</strong></TableCell>
+                  <TableCell><strong>Department</strong></TableCell>
+                  <TableCell><strong>Designation</strong></TableCell>
+                  <TableCell align="center"><strong>Working Days</strong></TableCell>
+                  <TableCell align="center"><strong>Present Days</strong></TableCell>
+                  <TableCell align="right"><strong>Gross Salary</strong></TableCell>
+                  <TableCell align="right"><strong>Total Deductions</strong></TableCell>
+                  <TableCell align="right"><strong>Net Salary</strong></TableCell>
+                  <TableCell align="center"><strong>Payroll Status</strong></TableCell>
+                  <TableCell align="center"><strong>Actions</strong></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {batchRecords.map((row) => (
+                  <TableRow key={row.employeeId} hover>
+                    <TableCell>{row.employeeId}</TableCell>
+                    <TableCell><strong>{row.employeeCode}</strong></TableCell>
+                    <TableCell>{row.employeeName}</TableCell>
+                    <TableCell>{row.department}</TableCell>
+                    <TableCell>{row.designation}</TableCell>
+                    <TableCell align="center">{row.workingDays}</TableCell>
+                    <TableCell align="center">{row.presentDays}</TableCell>
+                    <TableCell align="right">₹{row.grossSalary.toLocaleString('en-IN')}</TableCell>
+                    <TableCell align="right" sx={{ color: 'error.main' }}>₹{row.totalDeductions.toLocaleString('en-IN')}</TableCell>
+                    <TableCell align="right" sx={{ color: 'success.main', fontWeight: 'bold' }}>
+                      ₹{row.netSalary.toLocaleString('en-IN')}
+                    </TableCell>
+                    <TableCell align="center">
+                      <Chip
+                        label={row.payrollStatus}
+                        color={row.payrollStatus === 'FAILED' ? 'error' : row.payrollStatus === 'PROCESSED' ? 'primary' : 'success'}
+                        size="small"
+                        sx={{ fontWeight: 'bold' }}
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      {row.payslipId ? (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                          {row.payslipGenerated && (
+                            <Chip label="Generated" color="success" size="small" icon={<CheckCircleIcon fontSize="small" />} sx={{ height: 20, fontSize: '0.65rem' }} />
+                          )}
+                          <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                            <Tooltip title="View Payslip PDF">
+                              <IconButton color="info" size="small" onClick={() => handleViewPdf(row.payslipId!)}>
+                                <ViewIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Download Payslip PDF">
+                              <IconButton color="success" size="small" onClick={() => handleDownloadPdf(row.payslipId!, row.employeeName)}>
+                                <DownloadIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        </Box>
+                      ) : (
+                        <Typography variant="caption" color="text.secondary">-</Typography>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {/* Generate Payslip Button below table */}
+          {summaryStats.payslipsGenerated === 0 && (
+            <>
+              <Divider sx={{ my: 3 }} />
+              <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
+                <Button
+                  variant="contained"
+                  color="secondary"
+                  size="large"
+                  startIcon={isGeneratingPayslips ? <CircularProgress size={20} color="inherit" /> : <PictureAsPdfIcon />}
+                  disabled={isProcessing || isGeneratingPayslips || batchRecords.length === 0}
+                  onClick={handleGenerateBulkPayslips}
+                  sx={{
+                    px: 4,
+                    py: 1.2,
+                    fontWeight: 'bold',
+                    fontSize: '1rem',
+                    boxShadow: '0 4px 12px rgba(156, 39, 176, 0.25)',
+                  }}
+                >
+                  {isGeneratingPayslips ? 'Generating Payslips...' : 'Generate Payslip'}
+                </Button>
+              </Box>
+            </>
+          )}
+        </Paper>
+      )}
+
+      {/* Failed Employees Summary Log (if any) */}
+      {batchRecords.filter(r => r.payrollStatus === 'FAILED' || r.error).length > 0 && (
+        <Alert severity="error" icon={<ErrorIcon fontSize="inherit" />} sx={{ mb: 4, borderRadius: 2 }}>
+          <Typography variant="subtitle1" fontWeight="bold">
+            Failed Employees Summary
+          </Typography>
+          {batchRecords.filter(r => r.payrollStatus === 'FAILED' || r.error).map(r => (
+            <Typography key={r.employeeId} variant="body2">
+              • <strong>{r.employeeName}</strong> ({r.employeeCode}): {r.error || 'Failed during processing'}
+            </Typography>
+          ))}
+        </Alert>
+      )}
+
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}

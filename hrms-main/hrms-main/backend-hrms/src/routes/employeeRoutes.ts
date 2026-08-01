@@ -3,8 +3,11 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import { getAllEmployees, getEmployeeById, createEmployee, updateEmployee, deleteEmployee, uploadEmployeeDocument, searchEmployees, createEmployeeWithPhoto, updateEmployeeWithPhoto, getEmployeeDocuments, deleteEmployeeDocument } from '../controllers/employeeController';
+import { authenticateToken } from '../middleware/auth';
 
 const router = express.Router();
+
+router.use(authenticateToken);
 
 import { UPLOAD_BASE_DIR } from '../config/uploadConfig';
 

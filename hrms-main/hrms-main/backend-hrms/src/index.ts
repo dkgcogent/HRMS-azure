@@ -32,8 +32,8 @@ import { ensureCoreTables } from './utils/bootstrap';
 import { login } from './controllers/authController';
 import adminAttendanceRoutes from './routes/adminAttendanceRoutes';
 import pdfRoutes from './routes/pdfRoutes';
-import kpiRoutes from './routes/kpiRoutes';
 import csvExportRoutes from './routes/csvExportRoutes';
+import kraRoutes from './routes/kraRoutes';
 import taskRoutes from './routes/taskRoutes';
 import offerLetterRoutes from './routes/offerLetterRoutes';
 import appointmentLetterRoutes from './routes/appointmentLetterRoutes';
@@ -282,9 +282,10 @@ app.use('/api/recruitment', recruitmentRoutes);
 console.log('Registering training routes...');
 app.use('/api/training', trainingRoutes);
 app.use('/api/pdf', pdfRoutes);
-app.use('/api/kpi', kpiRoutes);
+
 app.use('/api/csv-export', csvExportRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/kra', kraRoutes);
 app.use('/api/promotions', promotionRoutes);
 console.log('Registering award routes...');
 app.use('/api/awards', awardRoutes);
@@ -315,16 +316,7 @@ app.use((req, res) => {
     res.status(404).json({
       success: false,
       message: `API endpoint not found: ${req.method} ${req.originalUrl}. Please check the route and ensure the backend server is running correctly.`,
-      availableRoutes: {
-        kpi: [
-          'GET /api/kpi/',
-          'GET /api/kpi/categories',
-          'GET /api/kpi/hr/review',
-          'GET /api/kpi/admin/review',
-          'GET /api/kpi/manager/review',
-          'GET /api/kpi/:id',
-        ]
-      }
+
     });
   } else {
     res.status(404).json({ success: false, message: 'Route not found' });

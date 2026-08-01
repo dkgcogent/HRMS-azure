@@ -29,7 +29,7 @@ import {
   TableRow,
   Tooltip,
   Checkbox,
-  Autocomplete,
+
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -141,8 +141,7 @@ const EmployeeForm: React.FC = () => {
   const [banks, setBanks] = useState<any[]>([]);
   const [paymentModes, setPaymentModes] = useState<any[]>([]);
   const [qualifications, setQualifications] = useState<any[]>([]);
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [projects, setProjects] = useState<any[]>([]);
+
   const [masterDataLoading, setMasterDataLoading] = useState(false);
 
   // Document upload state
@@ -240,9 +239,7 @@ const EmployeeForm: React.FC = () => {
         banksRes,
         paymentModesRes,
         qualificationsRes,
-        documentTypesRes,
-        customersRes,
-        projectsRes
+        documentTypesRes
       ] = await Promise.all([
         apiService.getManpowerTypes(),
         apiService.getDepartments(),
@@ -252,9 +249,7 @@ const EmployeeForm: React.FC = () => {
         apiService.getBanks(),
         apiService.getPaymentModes(),
         apiService.getQualifications(),
-        apiService.getDocumentTypes(),
-        apiService.getCustomers(),
-        apiService.getProjects()
+        apiService.getDocumentTypes()
       ]);
 
       // Check for any failed responses
@@ -268,8 +263,6 @@ const EmployeeForm: React.FC = () => {
       if (!paymentModesRes.success) failedResponses.push('Payment Modes');
       if (!qualificationsRes.success) failedResponses.push('Qualifications');
       if (!documentTypesRes.success) failedResponses.push('Document Types');
-      if (!customersRes.success) failedResponses.push('Customers');
-      if (!projectsRes.success) failedResponses.push('Projects');
 
       // Set data even if some responses failed
       setManpowerTypes(manpowerTypesRes.data || []);
@@ -283,10 +276,6 @@ const EmployeeForm: React.FC = () => {
       console.log('📚 Loaded qualifications:', qualificationsRes.data);
       setDocumentTypes(documentTypesRes.data || []);
       console.log('📄 Loaded document types:', documentTypesRes.data);
-      setCustomers(customersRes.data || []);
-      console.log('🏢 Loaded customers:', customersRes.data);
-      setProjects(projectsRes.data || []);
-      console.log('📁 Loaded projects:', projectsRes.data);
 
       // Show warning if some data failed to load
       if (failedResponses.length > 0) {
@@ -1353,96 +1342,7 @@ const EmployeeForm: React.FC = () => {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} md={6}>
-                <Autocomplete
-                  options={customers}
-                  getOptionLabel={(option) => typeof option === 'string' ? option : (option?.name || '')}
-                  isOptionEqualToValue={(option, value) => String(option.id) === String(value.id)}
-                  value={customers.find(c => String(c.id) === String(employee.customerId)) || null}
-                  onChange={(event, newValue) => {
-                    const customerId = newValue ? newValue.id : 0;
-                    const customerCode = newValue ? newValue.code : '';
-                    setEmployee(prev => ({
-                      ...prev,
-                      customerId: customerId,
-                      customerCode: customerCode ? String(customerCode) : ''
-                    }));
-                  }}
-                  disabled={masterDataLoading}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      paddingTop: '9px !important',
-                      paddingBottom: '9px !important',
-                      paddingLeft: '12px !important',
-                      minHeight: '53px',
-                    },
-                    '& .MuiAutocomplete-input': {
-                      padding: '4px 4px !important',
-                    }
-                  }}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Customer"
-                      placeholder="Select Customer"
-                    />
-                  )}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Customer Code"
-                  value={employee.customerCode || ''}
-                  InputProps={{ readOnly: true }}
-                  sx={{ backgroundColor: '#f5f5f5' }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Autocomplete
-                  options={projects}
-                  getOptionLabel={(option) => typeof option === 'string' ? option : (option?.name || '')}
-                  isOptionEqualToValue={(option, value) => String(option.id) === String(value.id)}
-                  value={projects.find(p => String(p.id) === String(employee.projectId)) || null}
-                  onChange={(event, newValue) => {
-                    const projectId = newValue ? newValue.id : 0;
-                    const projectCode = newValue ? newValue.code : '';
-                    setEmployee(prev => ({
-                      ...prev,
-                      projectId: projectId,
-                      projectCode: projectCode ? String(projectCode) : ''
-                    }));
-                  }}
-                  disabled={masterDataLoading}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      paddingTop: '9px !important',
-                      paddingBottom: '9px !important',
-                      paddingLeft: '12px !important',
-                      minHeight: '53px',
-                    },
-                    '& .MuiAutocomplete-input': {
-                      padding: '4px 4px !important',
-                    }
-                  }}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Project"
-                      placeholder="Select Project"
-                    />
-                  )}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Project Code"
-                  value={employee.projectCode || ''}
-                  InputProps={{ readOnly: true }}
-                  sx={{ backgroundColor: '#f5f5f5' }}
-                />
-              </Grid>
+
               <Grid item xs={12} md={6}>
                 <FormControl fullWidth>
                   <InputLabel>Status</InputLabel>

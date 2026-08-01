@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const jwt: any = require('jsonwebtoken');
+import pool from '../db';
 
 export interface AuthUser {
   id: number;
@@ -20,7 +21,7 @@ declare global {
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 
-export function authenticateToken(req: Request, res: Response, next: NextFunction) {
+export async function authenticateToken(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
   if (!token) {
@@ -29,9 +30,16 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 
   try {
     const payload = jwt.verify(token, JWT_SECRET) as AuthUser;
+    
+    // Verify user still exists in DB
+    const [rows]: any = await pool.query('SELECT id FROM hrms_users WHERE id = ?', [payload.id]);
+    if (!rows || rows.length === 0) {
+      return res.status(401).json({ success: false, message: 'Unauthorized: user no longer exists' });
+    }
+
     req.user = payload;
     next();
-  } catch {
+  } catch (error) {
     return res.status(401).json({ success: false, message: 'Unauthorized: invalid token' });
   }
 }

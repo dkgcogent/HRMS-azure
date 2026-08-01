@@ -502,7 +502,7 @@ const AssetForm: React.FC = () => {
 
   const depreciationMethodOptions = [
     { value: 'STRAIGHT_LINE', label: 'Straight Line' },
-    { value: 'PERCENTAGE', label: 'Percentage Based' },
+    { value: 'DECLINING_BALANCE', label: 'Percentage Based (Declining Balance)' },
   ];
 
   return (

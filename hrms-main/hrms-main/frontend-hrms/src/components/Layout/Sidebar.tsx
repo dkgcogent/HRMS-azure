@@ -14,6 +14,8 @@ import {
   Avatar,
   Chip,
   alpha,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -30,7 +32,7 @@ import {
   Schedule as ScheduleIcon,
   LocationOn as LocationIcon,
   Payment as PaymentIcon,
-  Assessment as AppraisalIcon,
+  Assessment as AssessmentIcon,
   Computer as AssetIcon,
   Assignment as TaskIcon,
   TrendingUp as PromotionIcon,
@@ -38,6 +40,7 @@ import {
   Notifications as NotificationIcon,
   AccountCircle as ProfileIcon,
   ChevronRight as ChevronRightIcon,
+  ChevronLeft as ChevronLeftIcon,
   EmojiEvents as AwardIcon,
   Gavel as ComplianceIcon,
   School as TrainingIcon,
@@ -48,7 +51,12 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const drawerWidth = 280;
 
-const Sidebar: React.FC = () => {
+interface SidebarProps {
+  open?: boolean;
+  onToggle?: () => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ open = true, onToggle }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
@@ -72,27 +80,28 @@ const Sidebar: React.FC = () => {
   const allMenuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard', roles: ['hr', 'admin'] },
     { text: 'Employees', icon: <PeopleIcon />, path: '/employees', roles: ['hr', 'admin'] },
-    { text: 'HR KPI Review', icon: <AppraisalIcon />, path: '/performance/hr-review', roles: ['hr'] },
-    { text: 'Admin KPI Review', icon: <AppraisalIcon />, path: '/performance/manager-review', roles: ['admin'] },
-    { text: 'KPI List', icon: <AppraisalIcon />, path: '/performance/kpi-list', roles: ['admin'] },
+
     { text: 'Assets', icon: <AssetIcon />, path: '/assets', roles: ['hr', 'admin'] },
+    { text: 'KRA Management', icon: <AssessmentIcon />, path: '/kra/dashboard', roles: ['hr', 'admin'] },
     { text: 'Tasks', icon: <TaskIcon />, path: '/tasks/hr', roles: ['hr'] },
     { text: 'Tasks', icon: <TaskIcon />, path: '/tasks/admin', roles: ['admin'] },
     { text: 'My Tasks', icon: <TaskIcon />, path: '/tasks/my', roles: ['employee'] },
-    { text: 'Promotions', icon: <PromotionIcon />, path: '/promotions', roles: ['admin'] },
-    { text: 'Training', icon: <TrainingIcon />, path: '/training', roles: ['hr', 'admin'] },
-    { text: 'Awards & Certifications', icon: <AwardIcon />, path: '/awards', roles: ['admin'] },
-    { text: 'Compliance (ESI/PF)', icon: <ComplianceIcon />, path: '/compliance', roles: ['admin'] },
-    { text: 'ID & Visiting Cards', icon: <CardIcon />, path: '/cards', roles: ['admin'] },
-    { text: 'Benefits', icon: <BenefitsIcon />, path: '/benefits/insurance', roles: ['admin'] },
-    { text: 'Notifications', icon: <NotificationIcon />, path: '/communication/notifications', roles: ['admin'] },
+    { text: 'My KRA', icon: <AssessmentIcon />, path: '/my-kra', roles: ['employee'] },
+    { text: 'Promotions', icon: <PromotionIcon />, path: '/promotions', roles: ['admin'], underDevelopment: true },
+    { text: 'Training', icon: <TrainingIcon />, path: '/training', roles: ['hr', 'admin'], underDevelopment: true },
+    { text: 'Awards & Certifications', icon: <AwardIcon />, path: '/awards', roles: ['admin'], underDevelopment: true },
+    { text: 'Compliance (ESI/PF)', icon: <ComplianceIcon />, path: '/compliance', roles: ['admin'], underDevelopment: true },
+    { text: 'ID & Visiting Cards', icon: <CardIcon />, path: '/cards', roles: ['admin'], underDevelopment: true },
+    { text: 'Benefits', icon: <BenefitsIcon />, path: '/benefits/insurance', roles: ['admin'], underDevelopment: true },
+    { text: 'Notifications', icon: <NotificationIcon />, path: '/communication/notifications', roles: ['admin'], underDevelopment: true },
     // { text: 'Offer Letter', icon: <DocumentIcon />, path: '/documents/offer-letter', roles: ['admin'] },
     { text: 'Letter', icon: <DocumentIcon />, path: '/documents/letters', roles: ['admin', 'hr'] },
     { text: 'Appointment Letter', icon: <DocumentIcon />, path: '/documents/appointment-letter', roles: ['admin', 'hr'] },
-    { text: 'Payslip', icon: <PaymentIcon />, path: '/payslips', roles: ['admin'] },
+    { text: 'Payroll', icon: <PaymentIcon />, path: '/payroll', roles: ['admin'] },
     // { text: 'Appointment Letter', icon: <DocumentIcon />, path: '/documents/my-offer-letter', roles: ['employee'] },
     { text: 'My Attendance', icon: <ScheduleIcon />, path: '/attendance', roles: ['employee', 'hr'] },
-    { text: 'My KPI', icon: <AppraisalIcon />, path: '/performance/kpi/create', roles: ['employee', 'hr'] },
+
+    { text: 'My Payslips', icon: <PaymentIcon />, path: '/my-payslips', roles: ['employee', 'hr'] },
     { text: 'My Profile', icon: <ProfileIcon />, path: '/profile', roles: ['employee', 'hr'] },
   ];
 
@@ -109,8 +118,6 @@ const Sidebar: React.FC = () => {
     { text: 'Payment Modes', icon: <PaymentIcon />, path: '/masters/payment-modes' },
     { text: 'Qualifications', icon: <SchoolIcon />, path: '/masters/qualifications' },
     { text: 'Document Types', icon: <DocumentIcon />, path: '/masters/document-types' },
-    { text: 'Customers', icon: <PersonIcon />, path: '/masters/customers' },
-    { text: 'Projects', icon: <WorkIcon />, path: '/masters/projects' },
   ];
 
   const isActive = (path: string) => {
@@ -119,10 +126,13 @@ const Sidebar: React.FC = () => {
 
   return (
     <Drawer
-      variant="permanent"
+      variant="persistent"
+      anchor="left"
+      open={open}
       sx={{
-        width: drawerWidth,
+        width: open ? drawerWidth : 0,
         flexShrink: 0,
+        display: open ? 'block' : 'none',
         '& .MuiDrawer-paper': {
           width: drawerWidth,
           boxSizing: 'border-box',
@@ -139,8 +149,26 @@ const Sidebar: React.FC = () => {
           textAlign: 'center',
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           color: 'white',
+          position: 'relative',
         }}
       >
+        {onToggle && (
+          <Tooltip title="Hide Sidebar">
+            <IconButton
+              onClick={onToggle}
+              size="small"
+              sx={{
+                color: 'white',
+                position: 'absolute',
+                right: 8,
+                top: 8,
+                '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.2)' },
+              }}
+            >
+              <ChevronLeftIcon />
+            </IconButton>
+          </Tooltip>
+        )}
         <Typography
           variant="h5"
           component="div"
@@ -268,7 +296,21 @@ const Sidebar: React.FC = () => {
                     fontWeight: active ? 600 : 500,
                   }}
                 />
-                {active && (
+                {(item as any).underDevelopment && (
+                  <Chip
+                    label="UD"
+                    size="small"
+                    sx={{
+                      height: 18,
+                      fontSize: '0.65rem',
+                      fontWeight: 600,
+                      backgroundColor: active ? 'rgba(255, 255, 255, 0.2)' : alpha('#f59e0b', 0.15),
+                      color: active ? 'white' : '#d97706',
+                      ml: 1,
+                    }}
+                  />
+                )}
+                {active && !((item as any).underDevelopment) && (
                   <ChevronRightIcon sx={{ fontSize: 20, ml: 1 }} />
                 )}
               </ListItemButton>
