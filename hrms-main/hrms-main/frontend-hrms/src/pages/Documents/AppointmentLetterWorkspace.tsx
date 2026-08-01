@@ -33,8 +33,7 @@ import {
   FingerprintOutlined as FingerprintIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { API_BASE_URL } from '../../services/api';
+import { api, getPublicUrl } from '../../services/api';
 
 // Custom Grid wrapper component to ensure div rendering for standard DKG grid items
 const Grid = (props: GridProps & {
@@ -189,7 +188,7 @@ const AppointmentLetterWorkspace: React.FC = () => {
 
   const fetchEmployees = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/employees`);
+      const response = await api.get('/api/employees');
       if (response.data.success) {
         setEmployees(response.data.data.content || []);
       }
@@ -394,7 +393,7 @@ const AppointmentLetterWorkspace: React.FC = () => {
 
     try {
       setLoading(true);
-      await axios.post(`${API_BASE_URL}/api/appointment-letters/generate`, { ...formData, showAnnexure });
+      await api.post('/api/appointment-letters/generate', { ...formData, showAnnexure });
       setSnackbar({
         open: true,
         message: 'Appointment Letter generated and saved successfully!',

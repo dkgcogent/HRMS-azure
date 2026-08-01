@@ -40,7 +40,7 @@ import {
     DialogContentText,
     DialogActions,
 } from '@mui/material';
-import { API_BASE_URL, getPublicUrl } from '../../services/api';
+import { api, getPublicUrl } from '../../services/api';
 
 interface OfferLetter {
     id: number;
@@ -72,7 +72,7 @@ const OfferLetterList: React.FC = () => {
     const fetchOfferLetters = async () => {
         try {
             setLoading(true);
-            const response = await axios.get(`${API_BASE_URL}/api/offer-letters/list`);
+            const response = await api.get('/api/offer-letters/list');
             if (response.data.success) {
                 setOfferLetters(response.data.data);
             }
@@ -85,7 +85,7 @@ const OfferLetterList: React.FC = () => {
 
     const fetchEmployees = async () => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/api/employees`);
+            const response = await api.get('/api/employees');
             if (response.data.success) {
                 setEmployees(response.data.data.content || []);
             }
@@ -132,7 +132,7 @@ const OfferLetterList: React.FC = () => {
     const handleDeleteConfirm = async () => {
         if (idToDelete) {
             try {
-                await axios.delete(`${API_BASE_URL}/api/offer-letters/${idToDelete}`);
+                await api.delete(`/api/offer-letters/${idToDelete}`);
                 fetchOfferLetters();
             } catch (error) {
                 console.error('Error deleting offer letter:', error);
@@ -162,7 +162,7 @@ const OfferLetterList: React.FC = () => {
 
         try {
             setLoading(true);
-            await axios.put(`${API_BASE_URL}/api/offer-letters/${selectedLetter.id}/status`, {
+            await api.put(`/api/offer-letters/${selectedLetter.id}/status`, {
                 status: 'Sent',
                 employeeId: selectedEmployeeId
             });

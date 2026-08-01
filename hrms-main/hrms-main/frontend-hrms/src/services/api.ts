@@ -25,7 +25,7 @@ export const getPublicUrl = (path: string | null | undefined): string => {
 };
 
 // Create axios instance
-const api = axios.create({
+export const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
   headers: {
@@ -53,6 +53,10 @@ const retryApiCall = async (apiCall: () => Promise<any>, maxRetries = 3, delay =
     try {
       return await apiCall();
     } catch (error: any) {
+      // Do not retry authentication or authorization errors
+      if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+        throw error;
+      }
       retries++;
       console.warn(`API call failed, retry attempt ${retries}/${maxRetries}`);
       if (retries >= maxRetries) {

@@ -36,8 +36,7 @@ import {
     Download as DownloadIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { API_BASE_URL, getPublicUrl } from '../../services/api';
+import { api, getPublicUrl } from '../../services/api';
 
 interface AppointmentLetter {
     id: number;
@@ -88,7 +87,7 @@ const AppointmentLetterList: React.FC = () => {
     const fetchAppointmentLetters = async () => {
         try {
             setLoading(true);
-            const response = await axios.get(`${API_BASE_URL}/api/appointment-letters/list`);
+            const response = await api.get('/api/appointment-letters/list');
             if (response.data.success) {
                 setLetters(response.data.data);
             }
@@ -101,7 +100,7 @@ const AppointmentLetterList: React.FC = () => {
 
     const fetchEmployees = async () => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/api/employees`);
+            const response = await api.get('/api/employees');
             if (response.data.success) {
                 setEmployees(response.data.data.content || []);
             }
@@ -160,7 +159,7 @@ const AppointmentLetterList: React.FC = () => {
     const handleDeleteConfirm = async () => {
         if (idToDelete) {
             try {
-                await axios.delete(`${API_BASE_URL}/api/appointment-letters/${idToDelete}`);
+                await api.delete(`/api/appointment-letters/${idToDelete}`);
                 fetchAppointmentLetters();
             } catch (error) {
                 console.error('Error deleting letter:', error);
@@ -185,7 +184,7 @@ const AppointmentLetterList: React.FC = () => {
 
         try {
             setLoading(true);
-            await axios.put(`${API_BASE_URL}/api/appointment-letters/${selectedLetter.id}/status`, {
+            await api.put(`/api/appointment-letters/${selectedLetter.id}/status`, {
                 status: 'Sent',
                 employeeId: selectedEmployeeId
             });
