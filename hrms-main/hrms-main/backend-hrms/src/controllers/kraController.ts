@@ -337,45 +337,142 @@ export const getMyKRA = async (req: Request, res: Response) => {
     let templateId = null;
     let assignment = null;
 
-    // 1. Direct Assignment lookup by employeeId
+    // Build comprehensive employee identifiers
+    const targetFY = (financialYear as string) || '2026-2027';
+    let candidateEmpIds: string[] = [empIdStr];
+    let fullName = '';
+    let deptId = '';
+    let deptName = '';
+    let desigId = '';
+    let desigName = '';
+
     try {
-      const [assignmentRows] = await pool.query<RowDataPacket[]>(
-        'SELECT * FROM kra_assignments WHERE employeeId = ? ORDER BY id DESC LIMIT 1',
-        [empIdStr]
+      const [empRows] = await pool.query<RowDataPacket[]>(
+        `SELECT e.*, d.name AS department_name, des.name AS designation_name
+         FROM hrms_employees e
+         LEFT JOIN hrms_departments d ON e.department_id = d.id
+         LEFT JOIN hrms_designations des ON e.designation_id = des.id
+         WHERE e.id = ? OR e.employee_id = ?`,
+        [empIdStr, empIdStr]
       );
-      if (assignmentRows.length > 0) {
-        assignment = assignmentRows[0];
-        templateId = assignment.templateId;
+
+      if (empRows.length > 0) {
+        const emp = empRows[0];
+        if (emp.id) candidateEmpIds.push(String(emp.id));
+        if (emp.employee_id) candidateEmpIds.push(String(emp.employee_id));
+        fullName = `${emp.first_name || ''} ${emp.last_name || ''}`.trim();
+        deptId = emp.department_id ? String(emp.department_id) : '';
+        deptName = emp.department_name || '';
+        desigId = emp.designation_id ? String(emp.designation_id) : '';
+        desigName = emp.designation_name || '';
+      }
+
+      const [userRows] = await pool.query<RowDataPacket[]>(
+        `SELECT u.id as user_id, u.full_name, u.username, u.employee_id as user_emp_id,
+                e.id as emp_id, e.employee_id as emp_code, e.first_name, e.last_name,
+                COALESCE(e.department_id, u.department_id) as department_id, e.designation_id,
+                d.name AS department_name, des.name AS designation_name
+         FROM hrms_users u
+         LEFT JOIN hrms_employees e ON (u.employee_id = e.id OR u.username = e.employee_id)
+         LEFT JOIN hrms_departments d ON COALESCE(e.department_id, u.department_id) = d.id
+         LEFT JOIN hrms_designations des ON e.designation_id = des.id
+         WHERE u.id = ? OR u.employee_id = ? OR u.username = ?`,
+        [empIdStr, empIdStr, empIdStr]
+      );
+
+      if (userRows.length > 0) {
+        const usr = userRows[0];
+        if (usr.user_id) candidateEmpIds.push(String(usr.user_id));
+        if (usr.user_emp_id) candidateEmpIds.push(String(usr.user_emp_id));
+        if (usr.username) candidateEmpIds.push(String(usr.username));
+        if (usr.emp_id) candidateEmpIds.push(String(usr.emp_id));
+        if (usr.emp_code) candidateEmpIds.push(String(usr.emp_code));
+        if (!fullName && usr.full_name) fullName = usr.full_name;
+        if (!deptId && usr.department_id) deptId = String(usr.department_id);
+        if (!deptName && usr.department_name) deptName = usr.department_name;
+        if (!desigId && usr.designation_id) desigId = String(usr.designation_id);
+        if (!desigName && usr.designation_name) desigName = usr.designation_name;
       }
     } catch (e) {
-      console.warn('Note assignment lookup:', e);
+      console.warn('Note employee info resolution error:', e);
     }
 
-    // 2. If no direct assignment, check employee code or department
-    if (!templateId) {
+    candidateEmpIds = Array.from(new Set(candidateEmpIds.filter(Boolean)));
+
+    // Step 1: Direct Assignment lookup by candidate employee IDs
+    if (candidateEmpIds.length > 0) {
       try {
-        const [empRows] = await pool.query<RowDataPacket[]>('SELECT * FROM hrms_employees WHERE id = ? OR employee_id = ?', [empIdStr, empIdStr]);
-        if (empRows.length > 0) {
-          const emp = empRows[0];
-          const [assignByEmp] = await pool.query<RowDataPacket[]>(
-            'SELECT * FROM kra_assignments WHERE employeeId = ? OR employeeId = ? ORDER BY id DESC LIMIT 1',
-            [String(emp.id), String(emp.employee_id || '')]
-          );
-          if (assignByEmp.length > 0) {
-            assignment = assignByEmp[0];
-            templateId = assignment.templateId;
-          } else {
-            const [matchingTemplates] = await pool.query<RowDataPacket[]>(
-              'SELECT * FROM kra_templates WHERE (department = ? OR designation = ?) AND status = "Active" ORDER BY lastUpdated DESC LIMIT 1',
-              [emp.department_id, emp.designation_id]
-            );
-            if (matchingTemplates.length > 0) {
-              templateId = matchingTemplates[0].id;
-            }
-          }
+        const [assignmentRows] = await pool.query<RowDataPacket[]>(
+          `SELECT a.*, t.financialYear as t_fy
+           FROM kra_assignments a
+           JOIN kra_templates t ON a.templateId = t.id
+           WHERE a.employeeId IN (?)
+           ORDER BY (CASE WHEN t.financialYear = ? THEN 1 ELSE 2 END), a.id DESC
+           LIMIT 1`,
+          [candidateEmpIds, targetFY]
+        );
+        if (assignmentRows.length > 0) {
+          assignment = assignmentRows[0];
+          templateId = assignment.templateId;
         }
       } catch (e) {
-        console.warn('Note employee lookup:', e);
+        console.warn('Note assignment lookup:', e);
+      }
+    }
+
+    // Step 2: Match by Template Name (e.g., template named after employee)
+    if (!templateId && fullName) {
+      try {
+        const [nameMatched] = await pool.query<RowDataPacket[]>(
+          `SELECT * FROM kra_templates
+           WHERE (name IS NOT NULL AND name != '' AND (name = ? OR name LIKE ?))
+           ORDER BY (CASE WHEN financialYear = ? THEN 1 ELSE 2 END), (CASE WHEN status = 'Active' THEN 1 ELSE 2 END), lastUpdated DESC
+           LIMIT 1`,
+          [fullName, `%${fullName}%`, targetFY]
+        );
+        if (nameMatched.length > 0) {
+          templateId = nameMatched[0].id;
+        }
+      } catch (e) {
+        console.warn('Note name match lookup:', e);
+      }
+    }
+
+    // Step 3: Match by Department or Designation (IDs or Names)
+    if (!templateId && (deptId || deptName || desigId || desigName)) {
+      try {
+        const [deptMatched] = await pool.query<RowDataPacket[]>(
+          `SELECT * FROM kra_templates
+           WHERE (
+             (department IS NOT NULL AND department != '' AND (department = ? OR department = ?)) OR
+             (designation IS NOT NULL AND designation != '' AND (designation = ? OR designation = ?))
+           )
+           ORDER BY (CASE WHEN status = 'Active' THEN 1 ELSE 2 END), (CASE WHEN financialYear = ? THEN 1 ELSE 2 END), lastUpdated DESC
+           LIMIT 1`,
+          [deptId || '__none__', deptName || '__none__', desigId || '__none__', desigName || '__none__', targetFY]
+        );
+        if (deptMatched.length > 0) {
+          templateId = deptMatched[0].id;
+        }
+      } catch (e) {
+        console.warn('Note department/designation lookup:', e);
+      }
+    }
+
+    // Step 4: Fallback - any active template in the system
+    if (!templateId) {
+      try {
+        const [fallbackMatched] = await pool.query<RowDataPacket[]>(
+          `SELECT * FROM kra_templates
+           ORDER BY (CASE WHEN status = 'Active' THEN 1 ELSE 2 END), (CASE WHEN financialYear = ? THEN 1 ELSE 2 END), lastUpdated DESC
+           LIMIT 1`,
+          [targetFY]
+        );
+        if (fallbackMatched.length > 0) {
+          templateId = fallbackMatched[0].id;
+        }
+      } catch (e) {
+        console.warn('Note fallback lookup:', e);
       }
     }
 
@@ -390,12 +487,11 @@ export const getMyKRA = async (req: Request, res: Response) => {
     const [itemRows] = await pool.query<RowDataPacket[]>('SELECT * FROM kra_template_items WHERE template_id = ?', [templateId]);
 
     // Fetch Scores from kra_scores
-    const targetFY = (financialYear as string) || template?.financialYear || '2026-2027';
     let scoreRows: RowDataPacket[] = [];
     try {
       const [rows] = await pool.query<RowDataPacket[]>(
-        'SELECT * FROM kra_scores WHERE employee_id = ? AND financial_year = ?',
-        [empIdStr, targetFY]
+        'SELECT * FROM kra_scores WHERE employee_id IN (?) AND financial_year = ?',
+        [candidateEmpIds, targetFY]
       );
       scoreRows = rows;
     } catch (e) {
