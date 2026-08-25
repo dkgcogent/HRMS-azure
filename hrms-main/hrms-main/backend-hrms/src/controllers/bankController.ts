@@ -57,11 +57,11 @@ export const getBankById = async (req: Request, res: Response) => {
 
 export const createBank = async (req: Request, res: Response) => {
   const { name, ifscCode, branchName, address, city, state, isActive } = req.body;
-  if (!name || !ifscCode) {
-    return res.status(400).json({ success: false, message: 'Name and IFSC Code are required' });
+  if (!name) {
+    return res.status(400).json({ success: false, message: 'Name is required' });
   }
   try {
-    const [result]: any = await pool.query('INSERT INTO hrms_banks (name, ifsc_code, branch_name, address, city, state, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)', [name, ifscCode, branchName || null, address || null, city || null, state || null, isActive === undefined ? true : isActive]);
+    const [result]: any = await pool.query('INSERT INTO hrms_banks (name, ifsc_code, branch_name, address, city, state, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)', [name, ifscCode || '', branchName || '', address || '', city || '', state || '', isActive === undefined ? true : isActive]);
     const newBank = { id: result.insertId, name, ifscCode, branchName, address, city, state, isActive: isActive === undefined ? true : isActive };
     res.status(201).json({ success: true, message: 'Bank created successfully', data: newBank });
   } catch (error: any) {
@@ -69,18 +69,18 @@ export const createBank = async (req: Request, res: Response) => {
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ success: false, message: 'Bank with this name or IFSC Code already exists.' });
     }
-    res.status(500).json({ success: false, message: 'Failed to create bank' });
+    res.status(500).json({ success: false, message: 'Failed to create bank: ' + error.message });
   }
 };
 
 export const updateBank = async (req: Request, res: Response) => {
   const { id } = req.params;
   const { name, ifscCode, branchName, address, city, state, isActive } = req.body;
-  if (!name || !ifscCode) {
-    return res.status(400).json({ success: false, message: 'Name and IFSC Code are required' });
+  if (!name) {
+    return res.status(400).json({ success: false, message: 'Name is required' });
   }
   try {
-    const [result]: any = await pool.query('UPDATE hrms_banks SET name = ?, ifsc_code = ?, branch_name = ?, address = ?, city = ?, state = ?, is_active = ? WHERE id = ?', [name, ifscCode, branchName || null, address || null, city || null, state || null, isActive, id]);
+    const [result]: any = await pool.query('UPDATE hrms_banks SET name = ?, ifsc_code = ?, branch_name = ?, address = ?, city = ?, state = ?, is_active = ? WHERE id = ?', [name, ifscCode || '', branchName || '', address || '', city || '', state || '', isActive, id]);
     if (result.affectedRows === 0) {
       return res.status(404).json({ success: false, message: 'Bank not found' });
     }
@@ -91,7 +91,7 @@ export const updateBank = async (req: Request, res: Response) => {
     if (error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ success: false, message: 'Bank with this name or IFSC Code already exists.' });
     }
-    res.status(500).json({ success: false, message: 'Failed to update bank' });
+    res.status(500).json({ success: false, message: 'Failed to update bank: ' + error.message });
   }
 };
 

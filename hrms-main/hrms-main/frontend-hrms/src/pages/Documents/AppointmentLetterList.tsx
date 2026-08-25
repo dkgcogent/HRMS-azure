@@ -33,7 +33,8 @@ import {
     Visibility as ViewIcon,
     Delete as DeleteIcon,
     Send as SendIcon,
-    Download as DownloadIcon
+    Download as DownloadIcon,
+    UploadFile as UploadFileIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { api, getPublicUrl } from '../../services/api';
@@ -46,6 +47,7 @@ interface AppointmentLetter {
     joining_date: string;
     status: 'Draft' | 'Sent' | 'Viewed' | 'Accepted';
     pdf_path: string;
+    signed_pdf_path?: string;
     employee_id: number | null;
     monthly_ctc: number;
     yearly_ctc: number;
@@ -78,6 +80,10 @@ const AppointmentLetterList: React.FC = () => {
     const [sendDialogOpen, setSendDialogOpen] = useState(false);
     const [selectedLetter, setSelectedLetter] = useState<AppointmentLetter | null>(null);
     const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | string>('');
+
+    // Upload states
+    const [uploadingId, setUploadingId] = useState<number | null>(null);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         fetchAppointmentLetters();
@@ -198,6 +204,40 @@ const AppointmentLetterList: React.FC = () => {
         }
     };
 
+    const handleUploadClick = (id: number) => {
+        setUploadingId(id);
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file || !uploadingId) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            setLoading(true);
+            const response = await api.post(`/api/appointment-letters/${uploadingId}/upload-signed`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
+            if (response.data.success) {
+                fetchAppointmentLetters();
+            }
+        } catch (error) {
+            console.error('Error uploading signed letter:', error);
+            alert('Failed to upload signed letter');
+        } finally {
+            setLoading(false);
+            setUploadingId(null);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'Draft': return 'default';
@@ -230,6 +270,13 @@ const AppointmentLetterList: React.FC = () => {
                 >
                     Generate Appointment Letter
                 </Button>
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    style={{ display: 'none' }}
+                    onChange={handleFileChange}
+                    accept="application/pdf"
+                />
             </Box>
 
             <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
@@ -261,6 +308,7 @@ const AppointmentLetterList: React.FC = () => {
                             <TableCell sx={{ fontWeight: 'bold' }}>Yearly CTC</TableCell>
                             <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
                             <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Actions</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Signed Letter</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -272,7 +320,7 @@ const AppointmentLetterList: React.FC = () => {
                             </TableRow>
                         ) : filteredLetters.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
+                                <TableCell colSpan={9} align="center" sx={{ py: 3 }}>
                                     <Typography color="text.secondary">No appointment letters found</Typography>
                                 </TableCell>
                             </TableRow>
@@ -329,6 +377,20 @@ const AppointmentLetterList: React.FC = () => {
                                         <Tooltip title="Delete">
                                             <IconButton size="small" color="error" onClick={() => handleDeleteClick(letter.id)}>
                                                 <DeleteIcon />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </TableCell>
+                                    <TableCell align="center">
+                                        {letter.signed_pdf_path && (
+                                            <Tooltip title="View Signed">
+                                                <IconButton size="small" color="info" onClick={() => handleView(letter.signed_pdf_path!)}>
+                                                    <ViewIcon />
+                                                </IconButton>
+                                            </Tooltip>
+                                        )}
+                                        <Tooltip title={letter.signed_pdf_path ? "Re-upload Signed Letter" : "Upload Signed Letter"}>
+                                            <IconButton size="small" sx={{ color: '#4caf50' }} onClick={() => handleUploadClick(letter.id)}>
+                                                <UploadFileIcon />
                                             </IconButton>
                                         </Tooltip>
                                     </TableCell>

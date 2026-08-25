@@ -61,6 +61,7 @@ interface AppointmentLetterRecord extends RowDataPacket {
     generated_date: string;
     status: 'Draft' | 'Sent' | 'Viewed' | 'Accepted';
     pdf_path: string;
+    signed_pdf_path?: string;
     appointment_data: AppointmentLetterData | string;
     created_at: Date;
     updated_at: Date;
@@ -546,8 +547,9 @@ export const generateAppointmentLetterPDF = async (req: Request, res: Response) 
 export const getAppointmentLetters = async (req: Request, res: Response) => {
     try {
         const [rows] = await pool.query<AppointmentLetterRecord[]>(
-            `SELECT id, candidate_name, employee_id, designation, generated_date, joining_date, status, pdf_path, monthly_ctc, yearly_ctc, appointment_data, created_at 
+            `SELECT id, candidate_name, employee_id, designation, generated_date, joining_date, status, pdf_path, signed_pdf_path, monthly_ctc, yearly_ctc, appointment_data, created_at 
              FROM hrms_appointment_letters 
+             WHERE NOT (status IN ('Draft', 'Sent') AND created_at < DATE_SUB(NOW(), INTERVAL 31 DAY))
              ORDER BY created_at DESC`
         );
         res.status(200).json({ success: true, data: rows });
@@ -610,6 +612,41 @@ export const deleteAppointmentLetter = async (req: Request, res: Response) => {
         res.status(200).json({ success: true, message: 'Appointment letter deleted successfully' });
     } catch (error: any) {
         res.status(500).json({ success: false, message: 'Error deleting appointment letter', error: error.message });
+    }
+};
+
+/**
+ * Upload Signed Appointment Letter
+ */
+export const uploadSignedAppointmentLetter = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const file = req.file;
+
+        if (!file) {
+            return res.status(400).json({ success: false, message: 'No file uploaded' });
+        }
+
+        const fileName = `Signed_Appointment_Letter_${id}_${Date.now()}.pdf`;
+        
+        // Upload to Blob Storage using existing service
+        const blobName = await uploadBufferToBlob(file.buffer, fileName, 'pdfs/', file.mimetype || 'application/pdf');
+        const webPath = getBlobUrl(blobName);
+
+        // Update Database
+        await pool.query(
+            'UPDATE hrms_appointment_letters SET signed_pdf_path = ?, status = "Accepted" WHERE id = ?',
+            [webPath, id]
+        );
+
+        res.status(200).json({ 
+            success: true, 
+            message: 'Signed appointment letter uploaded successfully',
+            signed_pdf_path: webPath 
+        });
+    } catch (error: any) {
+        console.error('Error uploading signed letter:', error);
+        res.status(500).json({ success: false, message: 'Error uploading signed letter', error: error.message });
     }
 };
 

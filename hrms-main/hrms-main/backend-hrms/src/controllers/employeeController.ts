@@ -62,25 +62,30 @@ const convertRowsToCamelCase = (rows: any[]): any[] => {
 // Utility function to generate the next employee ID (e.g., EMP001, EMP002, etc.)
 const generateEmployeeId = async (): Promise<string> => {
   try {
-    // Query to find the highest employee ID number
+    const currentYear = new Date().getFullYear();
+    const prefix = `CLPL/${currentYear}/`;
+    
+    // Query to find the highest employee ID number for the current year
     const [rows]: any = await pool.query(`
       SELECT employee_id
       FROM hrms_employees
       WHERE employee_id IS NOT NULL
-      AND employee_id LIKE 'EMP%'
-      ORDER BY CAST(SUBSTRING(employee_id, 4) AS UNSIGNED) DESC
+      AND employee_id LIKE ?
+      ORDER BY CAST(SUBSTRING(employee_id, 11) AS UNSIGNED) DESC
       LIMIT 1
-    `);
+    `, [`${prefix}%`]);
 
     let nextNumber = 1;
     if (rows.length > 0 && rows[0].employee_id) {
-      // Extract the number from the employee ID (e.g., "EMP005" -> 5)
-      const currentNumber = parseInt(rows[0].employee_id.substring(3), 10);
-      nextNumber = currentNumber + 1;
+      // Extract the number from the employee ID (e.g., "CLPL/2026/005" -> 5)
+      const currentNumber = parseInt(rows[0].employee_id.substring(10), 10);
+      if (!isNaN(currentNumber)) {
+        nextNumber = currentNumber + 1;
+      }
     }
 
-    // Format with zero-padding (e.g., 1 -> "EMP001", 25 -> "EMP025")
-    const employeeId = `EMP${String(nextNumber).padStart(3, '0')}`;
+    // Format with zero-padding (e.g., 1 -> "CLPL/2026/001")
+    const employeeId = `${prefix}${String(nextNumber).padStart(3, '0')}`;
     console.log(`Generated employee ID: ${employeeId}`);
     return employeeId;
   } catch (error) {

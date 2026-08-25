@@ -108,23 +108,23 @@ const BankList: React.FC = () => {
     const errors: string[] = [];
 
     if (!formData.name.trim()) errors.push('Bank name is required');
-    if (!formData.ifscCode.trim()) errors.push('IFSC code is required');
-    if (!formData.branchName.trim()) errors.push('Branch name is required');
-    if (!formData.address.trim()) errors.push('Address is required');
+    // if (!formData.ifscCode.trim()) errors.push('IFSC code is required');
+    // if (!formData.branchName.trim()) errors.push('Branch name is required');
+    // if (!formData.address.trim()) errors.push('Address is required');
 
     // Check for duplicate name or ifscCode
     const duplicate = banks.find(bank =>
-      ((bank.name || '').toLowerCase() === (formData.name || '').toLowerCase() ||
-      (bank.ifscCode || '').toLowerCase() === (formData.ifscCode || '').toLowerCase()) &&
+      ((bank.name || '').toLowerCase() === (formData.name || '').toLowerCase() /*||
+      (bank.ifscCode || '').toLowerCase() === (formData.ifscCode || '').toLowerCase()*/) &&
       (!editingBank || bank.id !== editingBank.id)
     );
     if (duplicate) {
       if ((duplicate.name || '').toLowerCase() === (formData.name || '').toLowerCase()) {
         errors.push('Bank name already exists');
       }
-      if ((duplicate.ifscCode || '').toLowerCase() === (formData.ifscCode || '').toLowerCase()) {
+      /*if ((duplicate.ifscCode || '').toLowerCase() === (formData.ifscCode || '').toLowerCase()) {
         errors.push('IFSC code already exists');
-      }
+      }*/
     }
 
     return errors;
@@ -195,9 +195,9 @@ const BankList: React.FC = () => {
             <TableHead>
               <TableRow sx={{ backgroundColor: 'grey.50' }}>
                 <TableCell sx={{ fontWeight: 'bold' }}>Bank Name</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>IFSC Code</TableCell>
+                {/* <TableCell sx={{ fontWeight: 'bold' }}>IFSC Code</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Branch Name</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Address</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Address</TableCell> */}
                 <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
               </TableRow>
@@ -206,13 +206,13 @@ const BankList: React.FC = () => {
               {banks.map((bank) => (
                 <TableRow key={bank.id} hover>
                   <TableCell sx={{ fontWeight: 'medium' }}>{bank.name}</TableCell>
-                  <TableCell>
+                  {/* <TableCell>
                     <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
                       {bank.ifscCode}
                     </Typography>
                   </TableCell>
                   <TableCell>{bank.branchName}</TableCell>
-                  <TableCell>{bank.address}</TableCell>
+                  <TableCell>{bank.address}</TableCell> */}
                   <TableCell>
                     <Chip
                       label={bank.isActive ? 'Active' : 'Inactive'}
@@ -240,7 +240,7 @@ const BankList: React.FC = () => {
               ))}
               {banks.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={3} align="center" sx={{ py: 4 }}>
                     <Typography color="text.secondary">
                       No banks found. Click "Add Bank" to create one.
                     </Typography>
@@ -266,7 +266,7 @@ const BankList: React.FC = () => {
               fullWidth
               required
             />
-            <TextField
+            {/* <TextField
               label="IFSC Code"
               value={formData.ifscCode}
               onChange={(e) => setFormData({ ...formData, ifscCode: e.target.value.toUpperCase() })}
@@ -301,7 +301,7 @@ const BankList: React.FC = () => {
               value={formData.state}
               onChange={(e) => setFormData({ ...formData, state: e.target.value })}
               fullWidth
-            />
+            /> */}
 
             <FormControl component="fieldset">
               <FormLabel component="legend" sx={{ mb: 1, fontWeight: 'bold' }}>Status</FormLabel>

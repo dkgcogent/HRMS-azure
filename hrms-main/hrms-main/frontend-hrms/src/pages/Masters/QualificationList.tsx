@@ -63,6 +63,7 @@ const QualificationList: React.FC = () => {
     'Secondary',
     'Higher Secondary',
     'Diploma',
+    'Graduate',
     'Undergraduate',
     'Postgraduate',
     'Doctorate',

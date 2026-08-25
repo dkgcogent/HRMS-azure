@@ -45,6 +45,9 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Employee, apiService, getPublicUrl } from '../../services/api';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
 // Create a Grid component that always includes component="div" for Grid items
 const Grid = (props: GridProps & {
@@ -329,6 +332,42 @@ const EmployeeForm: React.FC = () => {
       departmentId: departmentId,
       designationId: 0 // Reset designation when department changes
     }));
+  };
+
+  const handleIfscChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value.toUpperCase();
+    setEmployee(prev => ({ ...prev, ifscCode: value }));
+    
+    if (value.length === 11) {
+      try {
+        const response = await fetch(`https://ifsc.razorpay.com/${value}`);
+        if (response.ok) {
+          const data = await response.json();
+          setEmployee(prev => {
+            let matchedBankId = prev.bankId;
+            const matchingBank = banks.find(b => 
+              (b.name && data.BANK) && (b.name.toLowerCase().includes(data.BANK.toLowerCase()) || 
+              data.BANK.toLowerCase().includes(b.name.toLowerCase()))
+            );
+            if (matchingBank) {
+              matchedBankId = matchingBank.id;
+            }
+            return {
+              ...prev,
+              branchName: data.ADDRESS ? data.ADDRESS.split(' ').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ') : '',
+              bankId: matchedBankId || prev.bankId
+            };
+          });
+          setSnackbar({
+            open: true,
+            message: 'Bank details fetched successfully!',
+            severity: 'success'
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching IFSC details:', error);
+      }
+    }
   };
 
 
@@ -1080,7 +1119,20 @@ const EmployeeForm: React.FC = () => {
                 </FormControl>
               </Grid>
               <Grid item xs={12} md={4}>
-                <TextField fullWidth label="Date of Birth" type="date" required value={employee.dateOfBirth} onChange={handleInputChange('dateOfBirth')} InputLabelProps={{ shrink: true }} />
+                <LocalizationProvider dateAdapter={AdapterDateFns}>
+                  <DatePicker
+                    label="Date of Birth *"
+                    value={employee.dateOfBirth ? new Date(employee.dateOfBirth) : null}
+                    onChange={(date: Date | null) => {
+                      setEmployee(prev => ({
+                        ...prev,
+                        dateOfBirth: date ? date.toISOString().split('T')[0] : ''
+                      }));
+                    }}
+                    sx={{ width: '100%' }}
+                    format="dd-MM-yyyy"
+                  />
+                </LocalizationProvider>
               </Grid>
               <Grid item xs={12} md={4}>
                 <TextField fullWidth label="Mobile Number" required value={employee.mobile} onChange={handleInputChange('mobile')} />
@@ -1264,7 +1316,20 @@ const EmployeeForm: React.FC = () => {
                 </FormControl>
               </Grid>
               <Grid item xs={12} md={6}>
-                <TextField fullWidth label="Joining Date" type="date" required value={employee.joiningDate} onChange={handleInputChange('joiningDate')} InputLabelProps={{ shrink: true }} />
+                <LocalizationProvider dateAdapter={AdapterDateFns}>
+                  <DatePicker
+                    label="Joining Date *"
+                    value={employee.joiningDate ? new Date(employee.joiningDate) : null}
+                    onChange={(date: Date | null) => {
+                      setEmployee(prev => ({
+                        ...prev,
+                        joiningDate: date ? date.toISOString().split('T')[0] : ''
+                      }));
+                    }}
+                    sx={{ width: '100%' }}
+                    format="dd-MM-yyyy"
+                  />
+                </LocalizationProvider>
               </Grid>
               <Grid item xs={12} md={6}>
                 <FormControl fullWidth required>
@@ -1431,7 +1496,7 @@ const EmployeeForm: React.FC = () => {
                 <TextField fullWidth label="Account Holder Name" value={employee.accountHolderName || ''} onChange={handleInputChange('accountHolderName')} />
               </Grid>
               <Grid item xs={12} md={6}>
-                <TextField fullWidth label="IFSC Code" value={employee.ifscCode || ''} onChange={handleInputChange('ifscCode')} />
+                <TextField fullWidth label="IFSC Code" value={employee.ifscCode || ''} onChange={handleIfscChange} />
               </Grid>
               <Grid item xs={12} md={6}>
                 <TextField fullWidth label="Branch Name/Address" value={employee.branchName || ''} onChange={handleInputChange('branchName')} />
