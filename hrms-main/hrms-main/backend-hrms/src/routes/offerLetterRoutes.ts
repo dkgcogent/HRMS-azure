@@ -1,6 +1,7 @@
 import express from 'express';
 import {
     generateOfferLetterPDF,
+    saveOfferLetter,
     getOfferLetters,
     getOfferLetterById,
     updateOfferLetterStatus,
@@ -13,6 +14,7 @@ const router = express.Router();
 console.log('--- DEBUG: Initializing offerLetterRoutes router file --');
 // Offer Letter Generation Route
 router.post('/generate', generateOfferLetterPDF);
+router.post('/save', saveOfferLetter);
 
 // Offer Letter List & Management Routes
 router.get('/list', getOfferLetters);

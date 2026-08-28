@@ -22,7 +22,7 @@ import {
   Clear as ClearIcon,
   AutoFixHigh as MagicIcon,
 } from '@mui/icons-material';
-import { IMAGE_BASE_URL } from '../../services/api';
+import api, { IMAGE_BASE_URL } from '../../services/api';
 
 // --- Indian Number-to-Words Helper ---
 const numberToIndianWords = (num: number): string => {
@@ -314,7 +314,7 @@ const LetterGenerationForm: React.FC = () => {
     });
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!formData.candidateName || !formData.position || !formData.ctcFigure || !formData.joiningDate) {
       setSnackbar({
         open: true,
@@ -324,11 +324,25 @@ const LetterGenerationForm: React.FC = () => {
       return;
     }
 
-    setSnackbar({
-      open: true,
-      message: 'Generating print layout...',
-      severity: 'success'
-    });
+    try {
+      // Save offer letter data into MySQL hrms_offer_letters
+      await api.post('/api/offer-letters/save', {
+        ...formData,
+        salaryInputs,
+        useSalaryBreakup,
+        showAnnexure,
+        calcs
+      });
+
+      setSnackbar({
+        open: true,
+        message: 'Offer letter saved to database & print layout generated!',
+        severity: 'success'
+      });
+    } catch (err: any) {
+      console.error('Error saving offer letter to DB:', err);
+      // Still allow print even if saving failed
+    }
 
     setTimeout(() => {
       window.print();

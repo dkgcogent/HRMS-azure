@@ -110,6 +110,39 @@ interface BatchRecord {
   payslipGenerated?: boolean;
   error?: string;
   payrollPayload?: any;
+
+  // Detailed fields matching Excel structure
+  esicCovered?: string;
+  baseBasic?: number;
+  baseHra?: number;
+  baseOther?: number;
+  baseBonus?: number;
+  baseLeave?: number;
+  baseAdvance?: number;
+  baseGrossSalary?: number;
+  basicSalary?: number;
+  allowances?: {
+    hra: number;
+    transport: number;     // Performance Bonus
+    medical: number;       // Leave Encashment
+    other: number;         // Other Allowances
+    advanceBonus: number;  // Advance Bonus
+  };
+  deductions?: {
+    pf: number;
+    esi: number;
+    tax: number;           // P.Tax
+    other: number;         // LWF Self
+    tds?: number;
+    covidInsurance?: number;
+  };
+  emrPf?: number;
+  pfAdminCharges?: number;
+  emrEsic?: number;
+  emrLwf?: number;
+  emrGratuity?: number;
+  companyAdditionalCost?: number;
+  totalCtc?: number;
 }
 
 interface SummaryStats {
@@ -128,6 +161,7 @@ const PayrollForm: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [employees, setEmployees] = useState<any[]>([]);
+  const [summaryViewMode, setSummaryViewMode] = useState<'compact' | 'detailed'>('detailed');
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -150,18 +184,33 @@ const PayrollForm: React.FC = () => {
   const [progressText, setProgressText] = useState<string>('');
 
   const [batchRecords, setBatchRecords] = useState<BatchRecord[]>(() => {
-    const saved = sessionStorage.getItem('bulkPayroll_batchRecords');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const cached = sessionStorage.getItem('bulkPayroll_batchRecords');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
   });
+
   const [summaryStats, setSummaryStats] = useState<SummaryStats>(() => {
-    const saved = sessionStorage.getItem('bulkPayroll_summaryStats');
-    return saved ? JSON.parse(saved) : {
-      totalEmployees: 0,
-      payrollGenerated: 0,
-      payslipsGenerated: 0,
-      failedCount: 0,
-      completed: false,
-    };
+    try {
+      const cached = sessionStorage.getItem('bulkPayroll_summaryStats');
+      return cached ? JSON.parse(cached) : {
+        totalEmployees: 0,
+        payrollGenerated: 0,
+        payslipsGenerated: 0,
+        failedCount: 0,
+        completed: false
+      };
+    } catch {
+      return {
+        totalEmployees: 0,
+        payrollGenerated: 0,
+        payslipsGenerated: 0,
+        failedCount: 0,
+        completed: false
+      };
+    }
   });
 
   useEffect(() => {
@@ -172,35 +221,181 @@ const PayrollForm: React.FC = () => {
     sessionStorage.setItem('bulkPayroll_summaryStats', JSON.stringify(summaryStats));
   }, [fromDate, toDate, bulkStatus, batchRecords, summaryStats]);
 
+  // Export to Excel handler matching exact corporate structure
   const handleExportExcel = () => {
     if (batchRecords.length === 0) {
       setSnackbar({
         open: true,
-        message: 'No records to export',
+        message: 'No payroll records available to export.',
         severity: 'warning'
       });
       return;
     }
 
-    const exportData = batchRecords.map(record => ({
-      'Employee ID': record.employeeId,
-      'Employee Code': record.employeeCode,
-      'Employee Name': record.employeeName,
-      'Department': record.department,
-      'Designation': record.designation,
-      'Working Days': record.workingDays,
-      'Present Days': record.presentDays,
-      'Gross Salary': record.grossSalary,
-      'Total Deductions': record.totalDeductions,
-      'Net Salary': record.netSalary,
-      'Payroll Status': record.payrollStatus
-    }));
+    // Row 1: Super Headers (Categories)
+    const row1 = [
+      "", "", "", "", "",
+      "Rate of Wages", "", "", "", "", "", "",
+      "Earned Wages", "", "", "", "", "", "",
+      "Deductions", "", "", "", "", "", "",
+      "Net Amt",
+      "EMR Contribution", "", "", "", "", "",
+      "CTC"
+    ];
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    // Row 2: Sub Headers (Exact columns as user's template)
+    const row2 = [
+      "Employee Name",
+      "Employee ID",
+      "ESIC Covered",
+      "Total Payable Days",
+      "Total Paid Days",
+      "Basic",
+      "HRA",
+      "Other Allowances",
+      "Performance Bonus",
+      "Monthly_Leave_Encashment",
+      "Advance_Bonus",
+      "Gross",
+      "Basic",
+      "HRA",
+      "Other Allowances",
+      "Performance Bonus",
+      "Monthly_Leave_Encashment",
+      "Advance_Bonus",
+      "Gross",
+      "EMY PF12%",
+      "E.S.I.C 0.75%",
+      "P.Tax",
+      "LWF EE",
+      "TDS",
+      "Covid19 Insurance Charges",
+      "Tot Dedn",
+      "Net Amt",
+      "EMR PF 13.36%",
+      "PF Admin Charges",
+      "EMR ESIC 3.25%",
+      "EMR LWF",
+      "Gratuity",
+      "Total EMR'S Cont.",
+      "CTC"
+    ];
+
+    const dataRows = batchRecords.map(record => {
+      const proBasic = record.basicSalary ?? 0;
+      const proHra = record.allowances?.hra ?? 0;
+      const proOther = record.allowances?.other ?? 0;
+      const proBonus = record.allowances?.transport ?? 0;
+      const proLeave = record.allowances?.medical ?? 0;
+      const proAdvance = record.allowances?.advanceBonus ?? 0;
+      const proGross = record.grossSalary ?? (proBasic + proHra + proOther + proBonus + proLeave + proAdvance);
+
+      const emyPf = record.deductions?.pf ?? 0;
+      const emyEsic = record.deductions?.esi ?? 0;
+      const pTax = record.deductions?.tax ?? 0;
+      const lwfEe = record.deductions?.other ?? 0;
+      const tds = record.deductions?.tds ?? 0;
+      const covid = record.deductions?.covidInsurance ?? 0;
+      const totDedn = record.totalDeductions ?? (emyPf + emyEsic + pTax + lwfEe + tds + covid);
+      const netAmt = record.netSalary ?? Math.max(0, proGross - totDedn);
+
+      const emrPf = record.emrPf ?? 0;
+      const pfAdmin = record.pfAdminCharges ?? (proBasic > 0 ? Math.round(proBasic * 0.01) : 0);
+      const emrEsic = record.emrEsic ?? 0;
+      const emrLwf = record.emrLwf ?? 0;
+      const gratuity = record.emrGratuity ?? 0;
+      const totEmr = record.companyAdditionalCost ?? (emrPf + pfAdmin + emrEsic + emrLwf + gratuity);
+      const ctc = record.totalCtc ?? (proGross + totEmr);
+
+      return [
+        record.employeeName || '',
+        record.employeeCode || '',
+        record.esicCovered || 'No',
+        record.workingDays ?? 0,
+        record.presentDays ?? 0,
+        record.baseBasic ?? 0,
+        record.baseHra ?? 0,
+        record.baseOther ?? 0,
+        record.baseBonus ?? 0,
+        record.baseLeave ?? 0,
+        record.baseAdvance ?? 0,
+        record.baseGrossSalary ?? 0,
+        proBasic,
+        proHra,
+        proOther,
+        proBonus,
+        proLeave,
+        proAdvance,
+        proGross,
+        emyPf,
+        emyEsic,
+        pTax,
+        lwfEe,
+        tds,
+        covid,
+        totDedn,
+        netAmt,
+        emrPf,
+        pfAdmin,
+        emrEsic,
+        emrLwf,
+        gratuity,
+        totEmr,
+        ctc
+      ];
+    });
+
+    const aoa = [row1, row2, ...dataRows];
+    const worksheet = XLSX.utils.aoa_to_sheet(aoa);
+
+    // Merge super-headers matching categories
+    worksheet['!merges'] = [
+      { s: { r: 0, c: 5 }, e: { r: 0, c: 11 } },  // Rate of Wages (cols F to L)
+      { s: { r: 0, c: 12 }, e: { r: 0, c: 18 } }, // Earned Wages (cols M to S)
+      { s: { r: 0, c: 19 }, e: { r: 0, c: 25 } }, // Deductions (cols T to Z)
+      { s: { r: 0, c: 27 }, e: { r: 0, c: 32 } }, // EMR Contribution (cols AB to AG)
+    ];
+
+    // Column widths
+    worksheet['!cols'] = [
+      { wch: 22 }, // Employee Name
+      { wch: 18 }, // Employee ID
+      { wch: 14 }, // ESIC Covered
+      { wch: 18 }, // Total Payable Days
+      { wch: 16 }, // Total Paid Days
+      { wch: 12 }, // Basic (Rate)
+      { wch: 12 }, // HRA (Rate)
+      { wch: 16 }, // Other Allowances (Rate)
+      { wch: 18 }, // Performance Bonus (Rate)
+      { wch: 24 }, // Monthly_Leave_Encashment (Rate)
+      { wch: 16 }, // Advance_Bonus (Rate)
+      { wch: 14 }, // Gross (Rate)
+      { wch: 12 }, // Basic (Earned)
+      { wch: 12 }, // HRA (Earned)
+      { wch: 16 }, // Other Allowances (Earned)
+      { wch: 18 }, // Performance Bonus (Earned)
+      { wch: 24 }, // Monthly_Leave_Encashment (Earned)
+      { wch: 16 }, // Advance_Bonus (Earned)
+      { wch: 14 }, // Gross (Earned)
+      { wch: 14 }, // EMY PF12%
+      { wch: 14 }, // E.S.I.C 0.75%
+      { wch: 10 }, // P.Tax
+      { wch: 10 }, // LWF EE
+      { wch: 10 }, // TDS
+      { wch: 24 }, // Covid19 Insurance Charges
+      { wch: 12 }, // Tot Dedn
+      { wch: 14 }, // Net Amt
+      { wch: 16 }, // EMR PF 13.36%
+      { wch: 16 }, // PF Admin Charges
+      { wch: 16 }, // EMR ESIC 3.25%
+      { wch: 12 }, // EMR LWF
+      { wch: 12 }, // Gratuity
+      { wch: 18 }, // Total EMR'S Cont.
+      { wch: 14 }  // CTC
+    ];
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Payroll Summary");
-    
-    // Generate excel file and download
     XLSX.writeFile(workbook, `Payroll_Summary_${Date.now()}.xlsx`);
   };
 
@@ -778,6 +973,8 @@ const PayrollForm: React.FC = () => {
 
           generatedCount++;
 
+          const pfAdminCharges = (calcRes.basicSalary > 0 ? (calcRes.usePfCap && calcRes.basicSalary > 15000 ? 150 : Math.round(calcRes.basicSalary * 0.01)) : 0);
+
           records.push({
             employeeId: emp.id,
             employeeCode: emp.employeeId || `EMP-${emp.id}`,
@@ -792,7 +989,27 @@ const PayrollForm: React.FC = () => {
             payrollStatus: bulkStatus,
             payslipId: createdPayslipId,
             payslipGenerated: false,
-            payrollPayload: payslipPayload
+            payrollPayload: payslipPayload,
+
+            // Detailed Excel structure values
+            esicCovered: calcRes.esicCovered || 'No',
+            baseBasic: calcRes.baseBasic || 0,
+            baseHra: calcRes.baseHra || 0,
+            baseOther: calcRes.baseOther || 0,
+            baseBonus: calcRes.baseBonus || 0,
+            baseLeave: calcRes.baseLeave || 0,
+            baseAdvance: calcRes.baseAdvance || 0,
+            baseGrossSalary: calcRes.baseGrossSalary || 0,
+            basicSalary: calcRes.basicSalary || 0,
+            allowances: calcRes.allowances || { hra: 0, transport: 0, medical: 0, other: 0, advanceBonus: 0 },
+            deductions: calcRes.deductions || { pf: 0, esi: 0, tax: 0, other: 0, tds: 0, covidInsurance: 0 },
+            emrPf: calcRes.emrPf || 0,
+            pfAdminCharges,
+            emrEsic: calcRes.emrEsic || 0,
+            emrLwf: calcRes.emrLwf || 0,
+            emrGratuity: calcRes.emrGratuity || 0,
+            companyAdditionalCost: calcRes.companyAdditionalCost || 0,
+            totalCtc: calcRes.totalCtc || 0
           });
 
         } catch (err: any) {
@@ -1294,90 +1511,296 @@ const PayrollForm: React.FC = () => {
       {/* Payroll Summary Table */}
       {batchRecords.length > 0 && (
         <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 2 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-              Payroll Summary Table ({batchRecords.length} Employees)
-            </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                Payroll Summary Table ({batchRecords.length} Employees)
+              </Typography>
+              <Box sx={{ display: 'inline-flex', bgcolor: '#f0f4f8', p: 0.5, borderRadius: 1.5 }}>
+                <Button
+                  size="small"
+                  variant={summaryViewMode === 'detailed' ? 'contained' : 'text'}
+                  color="primary"
+                  onClick={() => setSummaryViewMode('detailed')}
+                  sx={{ textTransform: 'none', fontWeight: 'bold', fontSize: '0.8rem', py: 0.5 }}
+                >
+                  Full Wage Breakdown (Excel Format)
+                </Button>
+                <Button
+                  size="small"
+                  variant={summaryViewMode === 'compact' ? 'contained' : 'text'}
+                  color="primary"
+                  onClick={() => setSummaryViewMode('compact')}
+                  sx={{ textTransform: 'none', fontWeight: 'bold', fontSize: '0.8rem', py: 0.5 }}
+                >
+                  Compact Summary
+                </Button>
+              </Box>
+            </Box>
             <Button
               variant="contained"
               color="primary"
               startIcon={<DownloadIcon />}
               onClick={handleExportExcel}
               disabled={batchRecords.length === 0}
-              sx={{ borderRadius: 2 }}
+              sx={{
+                borderRadius: 2,
+                px: 3,
+                fontWeight: 'bold',
+                background: 'linear-gradient(135deg, #107c41 0%, #1f8a4c 100%)',
+                boxShadow: '0 4px 12px rgba(16, 124, 65, 0.3)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #0b5c30 0%, #15733e 100%)',
+                }
+              }}
             >
-              Export to Excel
+              Export to Excel (34 Columns)
             </Button>
           </Box>
 
-          <TableContainer>
-            <Table size="medium">
-              <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
-                <TableRow>
-                  <TableCell><strong>Employee ID</strong></TableCell>
-                  <TableCell><strong>Employee Code</strong></TableCell>
-                  <TableCell><strong>Employee Name</strong></TableCell>
-                  <TableCell><strong>Department</strong></TableCell>
-                  <TableCell><strong>Designation</strong></TableCell>
-                  <TableCell align="center"><strong>Working Days</strong></TableCell>
-                  <TableCell align="center"><strong>Present Days</strong></TableCell>
-                  <TableCell align="right"><strong>Gross Salary</strong></TableCell>
-                  <TableCell align="right"><strong>Total Deductions</strong></TableCell>
-                  <TableCell align="right"><strong>Net Salary</strong></TableCell>
-                  <TableCell align="center"><strong>Payroll Status</strong></TableCell>
-                  <TableCell align="center"><strong>Actions</strong></TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {batchRecords.map((row) => (
-                  <TableRow key={row.employeeId} hover>
-                    <TableCell>{row.employeeId}</TableCell>
-                    <TableCell><strong>{row.employeeCode}</strong></TableCell>
-                    <TableCell>{row.employeeName}</TableCell>
-                    <TableCell>{row.department}</TableCell>
-                    <TableCell>{row.designation}</TableCell>
-                    <TableCell align="center">{row.workingDays}</TableCell>
-                    <TableCell align="center">{row.presentDays}</TableCell>
-                    <TableCell align="right">₹{row.grossSalary.toLocaleString('en-IN')}</TableCell>
-                    <TableCell align="right" sx={{ color: 'error.main' }}>₹{row.totalDeductions.toLocaleString('en-IN')}</TableCell>
-                    <TableCell align="right" sx={{ color: 'success.main', fontWeight: 'bold' }}>
-                      ₹{row.netSalary.toLocaleString('en-IN')}
-                    </TableCell>
-                    <TableCell align="center">
-                      <Chip
-                        label={row.payrollStatus}
-                        color={row.payrollStatus === 'FAILED' ? 'error' : row.payrollStatus === 'PROCESSED' ? 'primary' : 'success'}
-                        size="small"
-                        sx={{ fontWeight: 'bold' }}
-                      />
-                    </TableCell>
-                    <TableCell align="center">
-                      {row.payslipId ? (
-                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
-                          {row.payslipGenerated && (
-                            <Chip label="Generated" color="success" size="small" icon={<CheckCircleIcon fontSize="small" />} sx={{ height: 20, fontSize: '0.65rem' }} />
-                          )}
-                          <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                            <Tooltip title="View Payslip PDF">
-                              <IconButton color="info" size="small" onClick={() => handleViewPdf(row.payslipId!)}>
-                                <ViewIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Download Payslip PDF">
-                              <IconButton color="success" size="small" onClick={() => handleDownloadPdf(row.payslipId!, row.employeeName)}>
-                                <DownloadIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
+          <TableContainer sx={{ maxHeight: 600, border: '1px solid #e0e0e0', borderRadius: 1.5 }}>
+            {summaryViewMode === 'compact' ? (
+              <Table size="small" stickyHeader>
+                <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                  <TableRow>
+                    <TableCell><strong>Employee ID</strong></TableCell>
+                    <TableCell><strong>Employee Code</strong></TableCell>
+                    <TableCell><strong>Employee Name</strong></TableCell>
+                    <TableCell><strong>Department</strong></TableCell>
+                    <TableCell><strong>Designation</strong></TableCell>
+                    <TableCell align="center"><strong>Payable Days</strong></TableCell>
+                    <TableCell align="center"><strong>Paid Days</strong></TableCell>
+                    <TableCell align="right"><strong>Gross Salary</strong></TableCell>
+                    <TableCell align="right"><strong>Total Deductions</strong></TableCell>
+                    <TableCell align="right"><strong>Net Salary</strong></TableCell>
+                    <TableCell align="center"><strong>Payroll Status</strong></TableCell>
+                    <TableCell align="center"><strong>Actions</strong></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {batchRecords.map((row) => (
+                    <TableRow key={row.employeeId} hover>
+                      <TableCell>{row.employeeId}</TableCell>
+                      <TableCell><strong>{row.employeeCode}</strong></TableCell>
+                      <TableCell>{row.employeeName}</TableCell>
+                      <TableCell>{row.department}</TableCell>
+                      <TableCell>{row.designation}</TableCell>
+                      <TableCell align="center">{row.workingDays}</TableCell>
+                      <TableCell align="center">{row.presentDays}</TableCell>
+                      <TableCell align="right">₹{row.grossSalary.toLocaleString('en-IN')}</TableCell>
+                      <TableCell align="right" sx={{ color: 'error.main' }}>₹{row.totalDeductions.toLocaleString('en-IN')}</TableCell>
+                      <TableCell align="right" sx={{ color: 'success.main', fontWeight: 'bold' }}>
+                        ₹{row.netSalary.toLocaleString('en-IN')}
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={row.payrollStatus}
+                          color={row.payrollStatus === 'FAILED' ? 'error' : row.payrollStatus === 'PROCESSED' ? 'primary' : 'success'}
+                          size="small"
+                          sx={{ fontWeight: 'bold' }}
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        {row.payslipId ? (
+                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                            {row.payslipGenerated && (
+                              <Chip label="Generated" color="success" size="small" icon={<CheckCircleIcon fontSize="small" />} sx={{ height: 20, fontSize: '0.65rem' }} />
+                            )}
+                            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                              <Tooltip title="View Payslip PDF">
+                                <IconButton color="info" size="small" onClick={() => handleViewPdf(row.payslipId!)}>
+                                  <ViewIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Download Payslip PDF">
+                                <IconButton color="success" size="small" onClick={() => handleDownloadPdf(row.payslipId!, row.employeeName)}>
+                                  <DownloadIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
                           </Box>
-                        </Box>
-                      ) : (
-                        <Typography variant="caption" color="text.secondary">-</Typography>
-                      )}
+                        ) : (
+                          <Typography variant="caption" color="text.secondary">-</Typography>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <Table size="small" stickyHeader sx={{ minWidth: 2600 }}>
+                {/* Tier 1: Category Super-headers */}
+                <TableHead>
+                  <TableRow>
+                    <TableCell colSpan={5} sx={{ backgroundColor: '#e2e8f0', fontWeight: 'bold', textAlign: 'center', borderRight: '2px solid #cbd5e1' }}>
+                      EMPLOYEE BASIC INFO
+                    </TableCell>
+                    <TableCell colSpan={7} sx={{ backgroundColor: '#dbeafe', color: '#1e40af', fontWeight: 'bold', textAlign: 'center', borderRight: '2px solid #93c5fd' }}>
+                      RATE OF WAGES
+                    </TableCell>
+                    <TableCell colSpan={7} sx={{ backgroundColor: '#fce7f3', color: '#9d174d', fontWeight: 'bold', textAlign: 'center', borderRight: '2px solid #f9a8d4' }}>
+                      EARNED WAGES
+                    </TableCell>
+                    <TableCell colSpan={7} sx={{ backgroundColor: '#fee2e2', color: '#991b1b', fontWeight: 'bold', textAlign: 'center', borderRight: '2px solid #fca5a5' }}>
+                      DEDUCTIONS
+                    </TableCell>
+                    <TableCell sx={{ backgroundColor: '#fef08a', color: '#854d0e', fontWeight: 'bold', textAlign: 'center', borderRight: '2px solid #fde047' }}>
+                      NET AMOUNT
+                    </TableCell>
+                    <TableCell colSpan={6} sx={{ backgroundColor: '#e0f2fe', color: '#0369a1', fontWeight: 'bold', textAlign: 'center', borderRight: '2px solid #7dd3fc' }}>
+                      EMR CONTRIBUTION
+                    </TableCell>
+                    <TableCell sx={{ backgroundColor: '#dcfce7', color: '#166534', fontWeight: 'bold', textAlign: 'center' }}>
+                      CTC
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+
+                  {/* Tier 2: Exact Column Sub-headers */}
+                  <TableRow sx={{ backgroundColor: '#f8fafc' }}>
+                    <TableCell sx={{ minWidth: 160, fontWeight: 'bold' }}>Employee Name</TableCell>
+                    <TableCell sx={{ minWidth: 130, fontWeight: 'bold' }}>Employee ID</TableCell>
+                    <TableCell sx={{ minWidth: 90, textAlign: 'center', fontWeight: 'bold' }}>ESIC</TableCell>
+                    <TableCell sx={{ minWidth: 90, textAlign: 'center', fontWeight: 'bold' }}>Payable</TableCell>
+                    <TableCell sx={{ minWidth: 80, textAlign: 'center', fontWeight: 'bold', borderRight: '2px solid #cbd5e1' }}>Paid</TableCell>
+
+                    {/* Rate of Wages */}
+                    <TableCell sx={{ minWidth: 100, textAlign: 'right', fontWeight: 'bold', bgcolor: '#eff6ff' }}>Basic</TableCell>
+                    <TableCell sx={{ minWidth: 100, textAlign: 'right', fontWeight: 'bold', bgcolor: '#eff6ff' }}>HRA</TableCell>
+                    <TableCell sx={{ minWidth: 100, textAlign: 'right', fontWeight: 'bold', bgcolor: '#eff6ff' }}>Other Allow</TableCell>
+                    <TableCell sx={{ minWidth: 100, textAlign: 'right', fontWeight: 'bold', bgcolor: '#eff6ff' }}>Perf Bonus</TableCell>
+                    <TableCell sx={{ minWidth: 110, textAlign: 'right', fontWeight: 'bold', bgcolor: '#eff6ff' }}>Leave Encash</TableCell>
+                    <TableCell sx={{ minWidth: 100, textAlign: 'right', fontWeight: 'bold', bgcolor: '#eff6ff' }}>Adv Bonus</TableCell>
+                    <TableCell sx={{ minWidth: 110, textAlign: 'right', fontWeight: 'bold', bgcolor: '#dbeafe', color: '#1e40af', borderRight: '2px solid #93c5fd' }}>Gross</TableCell>
+
+                    {/* Earned Wages */}
+                    <TableCell sx={{ minWidth: 100, textAlign: 'right', fontWeight: 'bold', bgcolor: '#fdf2f8' }}>Basic</TableCell>
+                    <TableCell sx={{ minWidth: 100, textAlign: 'right', fontWeight: 'bold', bgcolor: '#fdf2f8' }}>HRA</TableCell>
+                    <TableCell sx={{ minWidth: 100, textAlign: 'right', fontWeight: 'bold', bgcolor: '#fdf2f8' }}>Other Allow</TableCell>
+                    <TableCell sx={{ minWidth: 100, textAlign: 'right', fontWeight: 'bold', bgcolor: '#fdf2f8' }}>Perf Bonus</TableCell>
+                    <TableCell sx={{ minWidth: 110, textAlign: 'right', fontWeight: 'bold', bgcolor: '#fdf2f8' }}>Leave Encash</TableCell>
+                    <TableCell sx={{ minWidth: 100, textAlign: 'right', fontWeight: 'bold', bgcolor: '#fdf2f8' }}>Adv Bonus</TableCell>
+                    <TableCell sx={{ minWidth: 110, textAlign: 'right', fontWeight: 'bold', bgcolor: '#fce7f3', color: '#9d174d', borderRight: '2px solid #f9a8d4' }}>Gross</TableCell>
+
+                    {/* Deductions */}
+                    <TableCell sx={{ minWidth: 100, textAlign: 'right', fontWeight: 'bold', bgcolor: '#fef2f2' }}>PF 12%</TableCell>
+                    <TableCell sx={{ minWidth: 90, textAlign: 'right', fontWeight: 'bold', bgcolor: '#fef2f2' }}>ESIC 0.75%</TableCell>
+                    <TableCell sx={{ minWidth: 80, textAlign: 'right', fontWeight: 'bold', bgcolor: '#fef2f2' }}>P.Tax</TableCell>
+                    <TableCell sx={{ minWidth: 80, textAlign: 'right', fontWeight: 'bold', bgcolor: '#fef2f2' }}>LWF EE</TableCell>
+                    <TableCell sx={{ minWidth: 70, textAlign: 'right', fontWeight: 'bold', bgcolor: '#fef2f2' }}>TDS</TableCell>
+                    <TableCell sx={{ minWidth: 80, textAlign: 'right', fontWeight: 'bold', bgcolor: '#fef2f2' }}>Covid</TableCell>
+                    <TableCell sx={{ minWidth: 100, textAlign: 'right', fontWeight: 'bold', bgcolor: '#fee2e2', color: '#991b1b', borderRight: '2px solid #fca5a5' }}>Tot Dedn</TableCell>
+
+                    {/* Net Amt */}
+                    <TableCell sx={{ minWidth: 120, textAlign: 'right', fontWeight: 'bold', bgcolor: '#fef08a', color: '#854d0e', borderRight: '2px solid #fde047' }}>Net Amt</TableCell>
+
+                    {/* EMR Contribution */}
+                    <TableCell sx={{ minWidth: 100, textAlign: 'right', fontWeight: 'bold', bgcolor: '#f0f9ff' }}>EMR PF</TableCell>
+                    <TableCell sx={{ minWidth: 90, textAlign: 'right', fontWeight: 'bold', bgcolor: '#f0f9ff' }}>PF Admin</TableCell>
+                    <TableCell sx={{ minWidth: 90, textAlign: 'right', fontWeight: 'bold', bgcolor: '#f0f9ff' }}>EMR ESIC</TableCell>
+                    <TableCell sx={{ minWidth: 80, textAlign: 'right', fontWeight: 'bold', bgcolor: '#f0f9ff' }}>EMR LWF</TableCell>
+                    <TableCell sx={{ minWidth: 90, textAlign: 'right', fontWeight: 'bold', bgcolor: '#f0f9ff' }}>Gratuity</TableCell>
+                    <TableCell sx={{ minWidth: 110, textAlign: 'right', fontWeight: 'bold', bgcolor: '#e0f2fe', color: '#0369a1', borderRight: '2px solid #7dd3fc' }}>Tot EMR</TableCell>
+
+                    {/* CTC */}
+                    <TableCell sx={{ minWidth: 120, textAlign: 'right', fontWeight: 'bold', bgcolor: '#dcfce7', color: '#166534' }}>CTC</TableCell>
+                  </TableRow>
+                </TableHead>
+
+                <TableBody>
+                  {batchRecords.map((row) => {
+                    const proBasic = row.basicSalary ?? 0;
+                    const proHra = row.allowances?.hra ?? 0;
+                    const proOther = row.allowances?.other ?? 0;
+                    const proBonus = row.allowances?.transport ?? 0;
+                    const proLeave = row.allowances?.medical ?? 0;
+                    const proAdvance = row.allowances?.advanceBonus ?? 0;
+                    const proGross = row.grossSalary ?? (proBasic + proHra + proOther + proBonus + proLeave + proAdvance);
+
+                    const emyPf = row.deductions?.pf ?? 0;
+                    const emyEsic = row.deductions?.esi ?? 0;
+                    const pTax = row.deductions?.tax ?? 0;
+                    const lwfEe = row.deductions?.other ?? 0;
+                    const tds = row.deductions?.tds ?? 0;
+                    const covid = row.deductions?.covidInsurance ?? 0;
+                    const totDedn = row.totalDeductions ?? (emyPf + emyEsic + pTax + lwfEe + tds + covid);
+                    const netAmt = row.netSalary ?? Math.max(0, proGross - totDedn);
+
+                    const emrPf = row.emrPf ?? 0;
+                    const pfAdmin = row.pfAdminCharges ?? (proBasic > 0 ? Math.round(proBasic * 0.01) : 0);
+                    const emrEsic = row.emrEsic ?? 0;
+                    const emrLwf = row.emrLwf ?? 0;
+                    const gratuity = row.emrGratuity ?? 0;
+                    const totEmr = row.companyAdditionalCost ?? (emrPf + pfAdmin + emrEsic + emrLwf + gratuity);
+                    const ctc = row.totalCtc ?? (proGross + totEmr);
+
+                    return (
+                      <TableRow key={row.employeeId} hover>
+                        <TableCell sx={{ fontWeight: 'bold' }}>{row.employeeName}</TableCell>
+                        <TableCell>{row.employeeCode}</TableCell>
+                        <TableCell align="center">
+                          <Chip label={row.esicCovered || 'No'} size="small" variant="outlined" color={row.esicCovered === 'Yes' ? 'primary' : 'default'} sx={{ height: 20, fontSize: '0.7rem' }} />
+                        </TableCell>
+                        <TableCell align="center">{row.workingDays}</TableCell>
+                        <TableCell align="center" sx={{ borderRight: '2px solid #cbd5e1', fontWeight: 'bold' }}>{row.presentDays}</TableCell>
+
+                        {/* Rate of Wages */}
+                        <TableCell align="right">₹{(row.baseBasic ?? 0).toLocaleString('en-IN')}</TableCell>
+                        <TableCell align="right">₹{(row.baseHra ?? 0).toLocaleString('en-IN')}</TableCell>
+                        <TableCell align="right">₹{(row.baseOther ?? 0).toLocaleString('en-IN')}</TableCell>
+                        <TableCell align="right">{row.baseBonus ? `₹${row.baseBonus.toLocaleString('en-IN')}` : '-'}</TableCell>
+                        <TableCell align="right">{row.baseLeave ? `₹${row.baseLeave.toLocaleString('en-IN')}` : '-'}</TableCell>
+                        <TableCell align="right">{row.baseAdvance ? `₹${row.baseAdvance.toLocaleString('en-IN')}` : '-'}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 'bold', bgcolor: '#f0f7ff', borderRight: '2px solid #93c5fd' }}>
+                          ₹{(row.baseGrossSalary ?? 0).toLocaleString('en-IN')}
+                        </TableCell>
+
+                        {/* Earned Wages */}
+                        <TableCell align="right">₹{proBasic.toLocaleString('en-IN')}</TableCell>
+                        <TableCell align="right">₹{proHra.toLocaleString('en-IN')}</TableCell>
+                        <TableCell align="right">₹{proOther.toLocaleString('en-IN')}</TableCell>
+                        <TableCell align="right">{proBonus ? `₹${proBonus.toLocaleString('en-IN')}` : '-'}</TableCell>
+                        <TableCell align="right">{proLeave ? `₹${proLeave.toLocaleString('en-IN')}` : '-'}</TableCell>
+                        <TableCell align="right">{proAdvance ? `₹${proAdvance.toLocaleString('en-IN')}` : '-'}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 'bold', bgcolor: '#fff1f2', borderRight: '2px solid #f9a8d4' }}>
+                          ₹{proGross.toLocaleString('en-IN')}
+                        </TableCell>
+
+                        {/* Deductions */}
+                        <TableCell align="right">₹{emyPf.toLocaleString('en-IN')}</TableCell>
+                        <TableCell align="right">₹{emyEsic.toLocaleString('en-IN')}</TableCell>
+                        <TableCell align="right">₹{pTax.toLocaleString('en-IN')}</TableCell>
+                        <TableCell align="right">₹{lwfEe.toLocaleString('en-IN')}</TableCell>
+                        <TableCell align="right">{tds ? `₹${tds.toLocaleString('en-IN')}` : '-'}</TableCell>
+                        <TableCell align="right">{covid ? `₹${covid.toLocaleString('en-IN')}` : '-'}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 'bold', color: 'error.main', bgcolor: '#fef2f2', borderRight: '2px solid #fca5a5' }}>
+                          ₹{totDedn.toLocaleString('en-IN')}
+                        </TableCell>
+
+                        {/* Net Amt */}
+                        <TableCell align="right" sx={{ fontWeight: 'bold', color: '#854d0e', bgcolor: '#fef9c3', borderRight: '2px solid #fde047' }}>
+                          ₹{netAmt.toLocaleString('en-IN')}
+                        </TableCell>
+
+                        {/* EMR Contribution */}
+                        <TableCell align="right">₹{emrPf.toLocaleString('en-IN')}</TableCell>
+                        <TableCell align="right">₹{pfAdmin.toLocaleString('en-IN')}</TableCell>
+                        <TableCell align="right">₹{emrEsic.toLocaleString('en-IN')}</TableCell>
+                        <TableCell align="right">₹{emrLwf.toLocaleString('en-IN')}</TableCell>
+                        <TableCell align="right">₹{gratuity.toLocaleString('en-IN')}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 'bold', bgcolor: '#f0f9ff', borderRight: '2px solid #7dd3fc' }}>
+                          ₹{totEmr.toLocaleString('en-IN')}
+                        </TableCell>
+
+                        {/* CTC */}
+                        <TableCell align="right" sx={{ fontWeight: 'bold', color: 'success.dark', bgcolor: '#f0fdf4' }}>
+                          ₹{ctc.toLocaleString('en-IN')}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
           </TableContainer>
 
           {/* Generate Payslip Button below table */}

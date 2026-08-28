@@ -34,7 +34,7 @@ const KRATemplateForm: React.FC = () => {
   });
 
   const [rows, setRows] = useState<KRARow[]>([
-    { id: 'row_1', kraName: '', description: '', frequency: 'Yearly', weightage: 0 }
+    { id: `row_${Date.now()}_1`, kraName: '', description: '', frequency: 'Yearly', weightage: 0 }
   ]);
 
   const [departments, setDepartments] = useState<any[]>([]);
@@ -89,13 +89,13 @@ const KRATemplateForm: React.FC = () => {
   };
 
   const addRow = () => {
-    setRows([...rows, { id: `row_${Date.now()}`, kraName: '', description: '', frequency: 'Yearly', weightage: 0 }]);
+    setRows([...rows, { id: `row_${Date.now()}_${rows.length + 1}`, kraName: '', description: '', frequency: 'Yearly', weightage: 0 }]);
   };
 
   const duplicateRow = (index: number) => {
     const rowToDuplicate = rows[index];
     const newRows = [...rows];
-    newRows.splice(index + 1, 0, { ...rowToDuplicate, id: `row_${Date.now()}` });
+    newRows.splice(index + 1, 0, { ...rowToDuplicate, id: `row_${Date.now()}_${index + 1}` });
     setRows(newRows);
   };
 
@@ -123,18 +123,24 @@ const KRATemplateForm: React.FC = () => {
         ...formData,
         items: rows.map((r, index) => ({
           ...r,
-          id: r.id || `ITEM-${Date.now()}-${index}`
+          id: (r.id && !r.id.startsWith('row_')) ? r.id : `ITEM-${Date.now()}-${index + 1}`
         }))
       };
+      let res;
       if (isEdit && id) {
-        await apiService.updateKRATemplate(id, payload);
+        res = await apiService.updateKRATemplate(id, payload);
       } else {
-        await apiService.createKRATemplate(payload);
+        res = await apiService.createKRATemplate(payload);
+      }
+      if (res && res.success === false) {
+        setSnackbar({ open: true, message: res.message || 'Error saving template', severity: 'error' });
+        return;
       }
       setSnackbar({ open: true, message: 'Template saved successfully!', severity: 'success' });
       setTimeout(() => navigate('/kra/templates'), 1000);
-    } catch (error) {
-      setSnackbar({ open: true, message: 'Error saving template', severity: 'error' });
+    } catch (error: any) {
+      const errMsg = error?.response?.data?.message || error?.message || 'Error saving template';
+      setSnackbar({ open: true, message: errMsg, severity: 'error' });
     } finally {
       setLoading(false);
     }

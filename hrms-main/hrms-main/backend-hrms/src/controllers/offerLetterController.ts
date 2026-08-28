@@ -763,3 +763,67 @@ export const getMyOfferLetters = async (req: Request, res: Response) => {
         });
     }
 };
+
+/**
+ * Save offer letter directly from workspace to hrms_offer_letters
+ */
+export const saveOfferLetter = async (req: Request, res: Response) => {
+    try {
+        const data = req.body;
+        const candidateName = data.candidateName;
+        const designation = data.position || data.designation;
+        const joiningDate = data.joiningDate || new Date().toISOString().split('T')[0];
+        
+        let generatedDate = new Date().toISOString().split('T')[0];
+        if (data.letterDate) {
+            const parsed = new Date(data.letterDate);
+            if (!isNaN(parsed.getTime())) {
+                generatedDate = parsed.toISOString().split('T')[0];
+            }
+        }
+
+        const employeeId = data.employeeId || null;
+
+        // Parse CTC
+        const cleanCtc = typeof data.ctcFigure === 'string' ? parseFloat(data.ctcFigure.replace(/,/g, '')) : (data.yearlyCTC || 0);
+        const yearlyCTC = isNaN(cleanCtc) ? 0 : cleanCtc;
+        const monthlyCTC = Math.round(yearlyCTC / 12);
+
+        if (!candidateName) {
+            return res.status(400).json({
+                success: false,
+                message: 'Candidate Name is required'
+            });
+        }
+
+        const [result] = await pool.query<ResultSetHeader>(
+            `INSERT INTO hrms_offer_letters 
+            (candidate_name, employee_id, designation, generated_date, joining_date, status, monthly_ctc, yearly_ctc, offer_data) 
+            VALUES (?, ?, ?, ?, ?, 'Draft', ?, ?, ?)`,
+            [
+                candidateName,
+                employeeId,
+                designation || 'N/A',
+                generatedDate,
+                joiningDate,
+                monthlyCTC,
+                yearlyCTC,
+                JSON.stringify(data)
+            ]
+        );
+
+        res.status(201).json({
+            success: true,
+            message: 'Offer letter saved successfully to database',
+            data: { id: result.insertId }
+        });
+    } catch (error: any) {
+        console.error('Error saving offer letter:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to save offer letter',
+            error: error.message
+        });
+    }
+};
+

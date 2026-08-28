@@ -7,7 +7,7 @@ export interface ValidationRule {
   custom?: (value: any) => string | null;
 }
 
-export interface ValidationRules {
+export interface ValidationRulesMap {
   [key: string]: ValidationRule;
 }
 
@@ -53,7 +53,7 @@ export class Validator {
     return null;
   }
 
-  static validateForm(data: any, rules: ValidationRules): ValidationErrors {
+  static validateForm(data: any, rules: ValidationRulesMap): ValidationErrors {
     const errors: ValidationErrors = {};
 
     Object.keys(rules).forEach(field => {
@@ -188,7 +188,7 @@ export const ValidationRules = {
       if (value) {
         const birthDate = new Date(value);
         const today = new Date();
-        const age = today.getFullYear() - birthDate.getFullYear();
+        let age = today.getFullYear() - birthDate.getFullYear();
         const monthDiff = today.getMonth() - birthDate.getMonth();
         
         if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
@@ -208,7 +208,7 @@ export const ValidationRules = {
       if (value) {
         const birthDate = new Date(value);
         const today = new Date();
-        const age = today.getFullYear() - birthDate.getFullYear();
+        let age = today.getFullYear() - birthDate.getFullYear();
         const monthDiff = today.getMonth() - birthDate.getMonth();
         
         if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
@@ -225,7 +225,7 @@ export const ValidationRules = {
 };
 
 // Employee form validation rules
-export const employeeValidationRules: ValidationRules = {
+export const employeeValidationRules: ValidationRulesMap = {
   firstName: {
     required: true,
     minLength: 2,

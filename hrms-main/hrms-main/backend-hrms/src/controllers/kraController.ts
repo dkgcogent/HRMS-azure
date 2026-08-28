@@ -39,8 +39,6 @@ export const createKRATemplate = async (req: Request, res: Response) => {
 
   const connection = await pool.getConnection();
   try {
-    await connection.beginTransaction();
-
     await connection.query(`
       CREATE TABLE IF NOT EXISTS kra_templates (
         id VARCHAR(255) PRIMARY KEY,
@@ -77,6 +75,8 @@ export const createKRATemplate = async (req: Request, res: Response) => {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `).catch(() => {});
 
+    await connection.beginTransaction();
+
     await connection.query(
       'INSERT INTO kra_templates (id, name, department, designation, financialYear, effectiveFrom, effectiveTo, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
@@ -94,7 +94,9 @@ export const createKRATemplate = async (req: Request, res: Response) => {
     if (items && Array.isArray(items)) {
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
-        const itemId = item.id || `ITEM-${Date.now()}-${i}`;
+        const itemId = (item.id && !item.id.startsWith('row_'))
+          ? item.id
+          : `ITEM-${templateId}-${i + 1}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
         await connection.query(
           'INSERT INTO kra_template_items (id, template_id, kraName, description, frequency, weightage) VALUES (?, ?, ?, ?, ?, ?)',
           [
@@ -115,7 +117,7 @@ export const createKRATemplate = async (req: Request, res: Response) => {
     );
 
     await connection.commit();
-    res.status(201).json({ success: true, message: 'Template created successfully' });
+    res.status(201).json({ success: true, message: 'Template created successfully', data: { id: templateId } });
   } catch (error: any) {
     await connection.rollback();
     console.error('Error in createKRATemplate:', error);
@@ -152,7 +154,9 @@ export const updateKRATemplate = async (req: Request, res: Response) => {
     if (items && Array.isArray(items)) {
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
-        const itemId = item.id || `ITEM-${Date.now()}-${i}`;
+        const itemId = (item.id && !item.id.startsWith('row_'))
+          ? item.id
+          : `ITEM-${id}-${i + 1}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
         await connection.query(
           'INSERT INTO kra_template_items (id, template_id, kraName, description, frequency, weightage) VALUES (?, ?, ?, ?, ?, ?)',
           [
