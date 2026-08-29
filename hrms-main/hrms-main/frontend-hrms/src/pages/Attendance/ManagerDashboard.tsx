@@ -277,8 +277,8 @@ const ManagerDashboard: React.FC = () => {
                     <TableCell>
                       <Chip 
                         size="small" 
-                        label={rec.status || 'N/A'} 
-                        color={rec.status === 'PRESENT' ? 'success' : rec.status === 'LATE' ? 'warning' : rec.status === 'ABSENT' ? 'error' : 'default'} 
+                        label={rec.is_manual_entry && !rec.approved_by ? 'Approval Pending' : (rec.status || 'N/A')} 
+                        color={rec.is_manual_entry && !rec.approved_by ? 'warning' : rec.status === 'PRESENT' ? 'success' : rec.status === 'LATE' ? 'warning' : rec.status === 'ABSENT' ? 'error' : 'default'} 
                       />
                     </TableCell>
                     <TableCell>

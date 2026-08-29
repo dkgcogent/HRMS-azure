@@ -516,8 +516,8 @@ const EmployeeAttendance: React.FC = () => {
                     <TableCell>
                       <Chip
                         size="small"
-                        label={rec.status || 'N/A'}
-                        color={getStatusColor(rec.status) as any}
+                        label={rec.is_manual_entry && !rec.approved_by ? 'Approval Pending' : (rec.status || 'N/A')}
+                        color={rec.is_manual_entry && !rec.approved_by ? 'warning' : getStatusColor(rec.status) as any}
                       />
                     </TableCell>
                     <TableCell>{rec.work_location_type || '-'}</TableCell>
