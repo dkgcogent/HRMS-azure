@@ -232,56 +232,17 @@ const PayrollForm: React.FC = () => {
       return;
     }
 
-    // Row 1: Super Headers (Categories)
-    const row1 = [
-      "", "", "", "", "",
-      "Rate of Wages", "", "", "", "", "", "",
-      "Earned Wages", "", "", "", "", "", "",
-      "Deductions", "", "", "", "", "", "",
-      "Net Amt",
-      "EMR Contribution", "", "", "", "", "",
-      "CTC"
-    ];
+    const fromDateObj = new Date(fromDate);
+    const periodStr = `${fromDateObj.toLocaleString('default', { month: 'long', year: 'numeric' })}`;
 
-    // Row 2: Sub Headers (Exact columns as user's template)
-    const row2 = [
-      "Employee Name",
-      "Employee ID",
-      "ESIC Covered",
-      "Total Payable Days",
-      "Total Paid Days",
-      "Basic",
-      "HRA",
-      "Other Allowances",
-      "Performance Bonus",
-      "Monthly_Leave_Encashment",
-      "Advance_Bonus",
-      "Gross",
-      "Basic",
-      "HRA",
-      "Other Allowances",
-      "Performance Bonus",
-      "Monthly_Leave_Encashment",
-      "Advance_Bonus",
-      "Gross",
-      "EMY PF12%",
-      "E.S.I.C 0.75%",
-      "P.Tax",
-      "LWF EE",
-      "TDS",
-      "Covid19 Insurance Charges",
-      "Tot Dedn",
-      "Net Amt",
-      "EMR PF 13.36%",
-      "PF Admin Charges",
-      "EMR ESIC 3.25%",
-      "EMR LWF",
-      "Gratuity",
-      "Total EMR'S Cont.",
-      "CTC"
-    ];
+    let totals = {
+      baseBasic: 0, baseHra: 0, baseOther: 0, baseBonus: 0, baseLeave: 0, baseAdvance: 0, baseGross: 0,
+      proBasic: 0, proHra: 0, proOther: 0, proBonus: 0, proLeave: 0, proAdvance: 0, proGross: 0,
+      emyPf: 0, emyEsic: 0, pTax: 0, lwfEe: 0, tds: 0, covid: 0, totDedn: 0, netAmt: 0,
+      emrPf: 0, pfAdmin: 0, emrEsic: 0, emrLwf: 0, gratuity: 0, totEmr: 0, ctc: 0
+    };
 
-    const dataRows = batchRecords.map(record => {
+    const rowsHtml = batchRecords.map((record, index) => {
       const proBasic = record.basicSalary ?? 0;
       const proHra = record.allowances?.hra ?? 0;
       const proOther = record.allowances?.other ?? 0;
@@ -300,103 +261,244 @@ const PayrollForm: React.FC = () => {
       const netAmt = record.netSalary ?? Math.max(0, proGross - totDedn);
 
       const emrPf = record.emrPf ?? 0;
-      const pfAdmin = record.pfAdminCharges ?? (proBasic > 0 ? Math.round(proBasic * 0.01) : 0);
+      const pfAdmin = record.pfAdminCharges ?? 0;
       const emrEsic = record.emrEsic ?? 0;
       const emrLwf = record.emrLwf ?? 0;
       const gratuity = record.emrGratuity ?? 0;
       const totEmr = record.companyAdditionalCost ?? (emrPf + pfAdmin + emrEsic + emrLwf + gratuity);
       const ctc = record.totalCtc ?? (proGross + totEmr);
 
-      return [
-        record.employeeName || '',
-        record.employeeCode || '',
-        record.esicCovered || 'No',
-        record.workingDays ?? 0,
-        record.presentDays ?? 0,
-        record.baseBasic ?? 0,
-        record.baseHra ?? 0,
-        record.baseOther ?? 0,
-        record.baseBonus ?? 0,
-        record.baseLeave ?? 0,
-        record.baseAdvance ?? 0,
-        record.baseGrossSalary ?? 0,
-        proBasic,
-        proHra,
-        proOther,
-        proBonus,
-        proLeave,
-        proAdvance,
-        proGross,
-        emyPf,
-        emyEsic,
-        pTax,
-        lwfEe,
-        tds,
-        covid,
-        totDedn,
-        netAmt,
-        emrPf,
-        pfAdmin,
-        emrEsic,
-        emrLwf,
-        gratuity,
-        totEmr,
-        ctc
-      ];
-    });
+      const baseBasic = record.baseBasic ?? 0;
+      const baseHra = record.baseHra ?? 0;
+      const baseOther = record.baseOther ?? 0;
+      const baseBonus = record.baseBonus ?? 0;
+      const baseLeave = record.baseLeave ?? 0;
+      const baseAdvance = record.baseAdvance ?? 0;
+      const baseGross = record.baseGrossSalary || (baseBasic + baseHra + baseOther + baseBonus + baseLeave + baseAdvance);
 
-    const aoa = [row1, row2, ...dataRows];
-    const worksheet = XLSX.utils.aoa_to_sheet(aoa);
+      totals.baseBasic += baseBasic; totals.baseHra += baseHra; totals.baseOther += baseOther;
+      totals.baseBonus += baseBonus; totals.baseLeave += baseLeave; totals.baseAdvance += baseAdvance; totals.baseGross += baseGross;
+      totals.proBasic += proBasic; totals.proHra += proHra; totals.proOther += proOther;
+      totals.proBonus += proBonus; totals.proLeave += proLeave; totals.proAdvance += proAdvance; totals.proGross += proGross;
+      totals.emyPf += emyPf; totals.emyEsic += emyEsic; totals.pTax += pTax; totals.lwfEe += lwfEe;
+      totals.tds += tds; totals.covid += covid; totals.totDedn += totDedn; totals.netAmt += netAmt;
+      totals.emrPf += emrPf; totals.pfAdmin += pfAdmin; totals.emrEsic += emrEsic; totals.emrLwf += emrLwf;
+      totals.gratuity += gratuity; totals.totEmr += totEmr; totals.ctc += ctc;
 
-    // Merge super-headers matching categories
-    worksheet['!merges'] = [
-      { s: { r: 0, c: 5 }, e: { r: 0, c: 11 } },  // Rate of Wages (cols F to L)
-      { s: { r: 0, c: 12 }, e: { r: 0, c: 18 } }, // Earned Wages (cols M to S)
-      { s: { r: 0, c: 19 }, e: { r: 0, c: 25 } }, // Deductions (cols T to Z)
-      { s: { r: 0, c: 27 }, e: { r: 0, c: 32 } }, // EMR Contribution (cols AB to AG)
-    ];
+      const bgStyle = index % 2 === 0 ? 'background-color:#ffffff;' : 'background-color:#f8fafc;';
 
-    // Column widths
-    worksheet['!cols'] = [
-      { wch: 22 }, // Employee Name
-      { wch: 18 }, // Employee ID
-      { wch: 14 }, // ESIC Covered
-      { wch: 18 }, // Total Payable Days
-      { wch: 16 }, // Total Paid Days
-      { wch: 12 }, // Basic (Rate)
-      { wch: 12 }, // HRA (Rate)
-      { wch: 16 }, // Other Allowances (Rate)
-      { wch: 18 }, // Performance Bonus (Rate)
-      { wch: 24 }, // Monthly_Leave_Encashment (Rate)
-      { wch: 16 }, // Advance_Bonus (Rate)
-      { wch: 14 }, // Gross (Rate)
-      { wch: 12 }, // Basic (Earned)
-      { wch: 12 }, // HRA (Earned)
-      { wch: 16 }, // Other Allowances (Earned)
-      { wch: 18 }, // Performance Bonus (Earned)
-      { wch: 24 }, // Monthly_Leave_Encashment (Earned)
-      { wch: 16 }, // Advance_Bonus (Earned)
-      { wch: 14 }, // Gross (Earned)
-      { wch: 14 }, // EMY PF12%
-      { wch: 14 }, // E.S.I.C 0.75%
-      { wch: 10 }, // P.Tax
-      { wch: 10 }, // LWF EE
-      { wch: 10 }, // TDS
-      { wch: 24 }, // Covid19 Insurance Charges
-      { wch: 12 }, // Tot Dedn
-      { wch: 14 }, // Net Amt
-      { wch: 16 }, // EMR PF 13.36%
-      { wch: 16 }, // PF Admin Charges
-      { wch: 16 }, // EMR ESIC 3.25%
-      { wch: 12 }, // EMR LWF
-      { wch: 12 }, // Gratuity
-      { wch: 18 }, // Total EMR'S Cont.
-      { wch: 14 }  // CTC
-    ];
+      const fmt = (num: number) => num ? num.toLocaleString('en-IN') : '-';
+      const fmtN = (num: number) => num ? num.toLocaleString('en-IN') : '0';
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Payroll Summary");
-    XLSX.writeFile(workbook, `Payroll_Summary_${Date.now()}.xlsx`);
+      return `
+        <tr style="${bgStyle}">
+          <td style="text-align:left;font-weight:bold;border:1px solid #cbd5e1;padding:6px 10px;">${record.employeeName || ''}</td>
+          <td style="text-align:center;border:1px solid #cbd5e1;padding:6px 10px;">${record.employeeCode || ''}</td>
+          <td style="text-align:center;border:1px solid #cbd5e1;padding:6px 10px;">${record.esicCovered || 'No'}</td>
+          <td style="text-align:center;border:1px solid #cbd5e1;padding:6px 10px;">${record.workingDays ?? 0}</td>
+          <td style="text-align:center;font-weight:bold;border:1px solid #cbd5e1;border-right:2px solid #64748b;padding:6px 10px;">${record.presentDays ?? 0}</td>
+
+          <!-- Rate of Wages -->
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(baseBasic)}</td>
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(baseHra)}</td>
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(baseOther)}</td>
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(baseBonus)}</td>
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(baseLeave)}</td>
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(baseAdvance)}</td>
+          <td style="text-align:right;font-weight:bold;background-color:#eff6ff;color:#1e40af;border:1px solid #cbd5e1;border-right:2px solid #3b82f6;padding:6px 10px;">${fmtN(baseGross)}</td>
+
+          <!-- Earned Wages -->
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(proBasic)}</td>
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(proHra)}</td>
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(proOther)}</td>
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(proBonus)}</td>
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(proLeave)}</td>
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(proAdvance)}</td>
+          <td style="text-align:right;font-weight:bold;background-color:#fff1f2;color:#9d174d;border:1px solid #cbd5e1;border-right:2px solid #ec4899;padding:6px 10px;">${fmtN(proGross)}</td>
+
+          <!-- Deductions -->
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(emyPf)}</td>
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(emyEsic)}</td>
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(pTax)}</td>
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(lwfEe)}</td>
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(tds)}</td>
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(covid)}</td>
+          <td style="text-align:right;font-weight:bold;background-color:#fef2f2;color:#991b1b;border:1px solid #cbd5e1;border-right:2px solid #ef4444;padding:6px 10px;">${fmtN(totDedn)}</td>
+
+          <!-- Net Amt -->
+          <td style="text-align:right;font-weight:bold;background-color:#fef9c3;color:#854d0e;border:1px solid #cbd5e1;border-right:2px solid #eab308;padding:6px 10px;">${fmtN(netAmt)}</td>
+
+          <!-- EMR Contribution -->
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(emrPf)}</td>
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(pfAdmin)}</td>
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(emrEsic)}</td>
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(emrLwf)}</td>
+          <td style="text-align:right;border:1px solid #cbd5e1;padding:6px 10px;">${fmt(gratuity)}</td>
+          <td style="text-align:right;font-weight:bold;background-color:#f0f9ff;color:#0369a1;border:1px solid #cbd5e1;border-right:2px solid #06b6d4;padding:6px 10px;">${fmtN(totEmr)}</td>
+
+          <!-- CTC -->
+          <td style="text-align:right;font-weight:bold;background-color:#f0fdf4;color:#166534;border:1px solid #cbd5e1;padding:6px 10px;">${fmtN(ctc)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const fmtT = (num: number) => num ? num.toLocaleString('en-IN') : '0';
+
+    const totalsHtml = `
+      <tr style="background-color:#0f172a;color:#ffffff;font-weight:bold;">
+        <td colspan="5" style="text-align:center;border:1px solid #0f172a;padding:8px;font-size:11pt;">TOTAL (All ${batchRecords.length} Employees)</td>
+        
+        <!-- Rate Totals -->
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.baseBasic)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.baseHra)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.baseOther)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.baseBonus)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.baseLeave)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.baseAdvance)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;background-color:#1e3a8a;color:#ffffff;">${fmtT(totals.baseGross)}</td>
+
+        <!-- Earned Totals -->
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.proBasic)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.proHra)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.proOther)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.proBonus)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.proLeave)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.proAdvance)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;background-color:#831843;color:#ffffff;">${fmtT(totals.proGross)}</td>
+
+        <!-- Deduction Totals -->
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.emyPf)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.emyEsic)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.pTax)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.lwfEe)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.tds)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.covid)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;background-color:#7f1d1d;color:#ffffff;">${fmtT(totals.totDedn)}</td>
+
+        <!-- Net Totals -->
+        <td style="text-align:right;border:1px solid #334155;padding:8px;background-color:#713f12;color:#ffffff;">${fmtT(totals.netAmt)}</td>
+
+        <!-- EMR Totals -->
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.emrPf)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.pfAdmin)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.emrEsic)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.emrLwf)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;">${fmtT(totals.gratuity)}</td>
+        <td style="text-align:right;border:1px solid #334155;padding:8px;background-color:#0369a1;color:#ffffff;">${fmtT(totals.totEmr)}</td>
+
+        <!-- CTC Total -->
+        <td style="text-align:right;border:1px solid #334155;padding:8px;background-color:#14532d;color:#ffffff;">${fmtT(totals.ctc)}</td>
+      </tr>
+    `;
+
+    const htmlTable = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+      <!--[if gte mso 9]>
+      <xml>
+       <x:ExcelWorkbook>
+        <x:ExcelWorksheets>
+         <x:ExcelWorksheet>
+          <x:Name>Payroll Register</x:Name>
+          <x:WorksheetOptions>
+           <x:DisplayGridlines/>
+          </x:WorksheetOptions>
+         </x:ExcelWorksheet>
+        </x:ExcelWorksheets>
+       </x:ExcelWorkbook>
+      </xml>
+      <![endif]-->
+      </head>
+      <body style="font-family:'Segoe UI',Arial,sans-serif;">
+        <table style="border-collapse:collapse;width:100%;">
+          <thead>
+            <!-- Title Header -->
+            <tr>
+              <th colspan="35" style="background-color:#0f172a;color:#ffffff;font-size:16pt;font-weight:bold;text-align:center;padding:12px;">
+                COMPANY PAYROLL REGISTER & SALARY SUMMARY
+              </th>
+            </tr>
+            <tr>
+              <th colspan="35" style="background-color:#1e293b;color:#cbd5e1;font-size:10pt;text-align:center;padding:6px;">
+                Pay Period: ${periodStr} | Total Records: ${batchRecords.length} Employees | Generated on: ${new Date().toLocaleDateString('en-IN')}
+              </th>
+            </tr>
+            <tr><th colspan="35" style="height:10px;background-color:#ffffff;border:none;"></th></tr>
+
+            <!-- Super Headers -->
+            <tr>
+              <th colspan="5" style="background-color:#334155;color:#ffffff;font-weight:bold;text-align:center;border:1px solid #475569;padding:8px;">EMPLOYEE INFORMATION</th>
+              <th colspan="7" style="background-color:#1e40af;color:#ffffff;font-weight:bold;text-align:center;border:1px solid #3b82f6;padding:8px;">RATE OF WAGES (MONTHLY STRUCTURE)</th>
+              <th colspan="7" style="background-color:#9d174d;color:#ffffff;font-weight:bold;text-align:center;border:1px solid #ec4899;padding:8px;">EARNED WAGES (ATTENDANCE PRORATED)</th>
+              <th colspan="7" style="background-color:#991b1b;color:#ffffff;font-weight:bold;text-align:center;border:1px solid #ef4444;padding:8px;">EMPLOYEE DEDUCTIONS</th>
+              <th style="background-color:#854d0e;color:#ffffff;font-weight:bold;text-align:center;border:1px solid #eab308;padding:8px;">NET TAKE-HOME</th>
+              <th colspan="6" style="background-color:#0369a1;color:#ffffff;font-weight:bold;text-align:center;border:1px solid #06b6d4;padding:8px;">COMPANY CONTRIBUTION (EMR)</th>
+              <th style="background-color:#166534;color:#ffffff;font-weight:bold;text-align:center;border:1px solid #22c55e;padding:8px;">TOTAL CTC</th>
+            </tr>
+
+            <!-- Sub Headers -->
+            <tr>
+              <th style="background-color:#f1f5f9;color:#0f172a;font-weight:bold;text-align:center;border:1px solid #cbd5e1;padding:8px;min-width:180px;">Employee Name</th>
+              <th style="background-color:#f1f5f9;color:#0f172a;font-weight:bold;text-align:center;border:1px solid #cbd5e1;padding:8px;min-width:130px;">Employee ID</th>
+              <th style="background-color:#f1f5f9;color:#0f172a;font-weight:bold;text-align:center;border:1px solid #cbd5e1;padding:8px;min-width:100px;">ESIC Covered</th>
+              <th style="background-color:#f1f5f9;color:#0f172a;font-weight:bold;text-align:center;border:1px solid #cbd5e1;padding:8px;min-width:100px;">Payable Days</th>
+              <th style="background-color:#f1f5f9;color:#0f172a;font-weight:bold;text-align:center;border:1px solid #cbd5e1;border-right:2px solid #64748b;padding:8px;min-width:90px;">Paid Days</th>
+
+              <th style="background-color:#dbeafe;color:#1e40af;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:110px;">Basic</th>
+              <th style="background-color:#dbeafe;color:#1e40af;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:110px;">HRA</th>
+              <th style="background-color:#dbeafe;color:#1e40af;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:120px;">Other Allow</th>
+              <th style="background-color:#dbeafe;color:#1e40af;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:120px;">Perf Bonus</th>
+              <th style="background-color:#dbeafe;color:#1e40af;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:130px;">Leave Encash</th>
+              <th style="background-color:#dbeafe;color:#1e40af;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:120px;">Adv Bonus</th>
+              <th style="background-color:#bfdbfe;color:#1e3a8a;font-weight:bold;text-align:right;border:1px solid #cbd5e1;border-right:2px solid #3b82f6;padding:8px;min-width:130px;">Gross</th>
+
+              <th style="background-color:#fce7f3;color:#9d174d;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:110px;">Basic</th>
+              <th style="background-color:#fce7f3;color:#9d174d;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:110px;">HRA</th>
+              <th style="background-color:#fce7f3;color:#9d174d;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:120px;">Other Allow</th>
+              <th style="background-color:#fce7f3;color:#9d174d;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:120px;">Perf Bonus</th>
+              <th style="background-color:#fce7f3;color:#9d174d;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:130px;">Leave Encash</th>
+              <th style="background-color:#fce7f3;color:#9d174d;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:120px;">Adv Bonus</th>
+              <th style="background-color:#fbcfe8;color:#831843;font-weight:bold;text-align:right;border:1px solid #cbd5e1;border-right:2px solid #ec4899;padding:8px;min-width:130px;">Gross</th>
+
+              <th style="background-color:#fee2e2;color:#991b1b;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:110px;">PF 12%</th>
+              <th style="background-color:#fee2e2;color:#991b1b;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:110px;">ESIC 0.75%</th>
+              <th style="background-color:#fee2e2;color:#991b1b;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:90px;">P.Tax</th>
+              <th style="background-color:#fee2e2;color:#991b1b;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:90px;">LWF EE</th>
+              <th style="background-color:#fee2e2;color:#991b1b;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:80px;">TDS</th>
+              <th style="background-color:#fee2e2;color:#991b1b;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:90px;">Covid</th>
+              <th style="background-color:#fca5a5;color:#7f1d1d;font-weight:bold;text-align:right;border:1px solid #cbd5e1;border-right:2px solid #ef4444;padding:8px;min-width:120px;">Tot Dedn</th>
+
+              <th style="background-color:#fef08a;color:#854d0e;font-weight:bold;text-align:right;border:1px solid #cbd5e1;border-right:2px solid #eab308;padding:8px;min-width:130px;">Net Amt</th>
+
+              <th style="background-color:#e0f2fe;color:#0369a1;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:110px;">EMR PF</th>
+              <th style="background-color:#e0f2fe;color:#0369a1;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:110px;">PF Admin</th>
+              <th style="background-color:#e0f2fe;color:#0369a1;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:110px;">EMR ESIC</th>
+              <th style="background-color:#e0f2fe;color:#0369a1;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:100px;">EMR LWF</th>
+              <th style="background-color:#e0f2fe;color:#0369a1;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:100px;">Gratuity</th>
+              <th style="background-color:#bae6fd;color:#0369a1;font-weight:bold;text-align:right;border:1px solid #cbd5e1;border-right:2px solid #06b6d4;padding:8px;min-width:130px;">Total EMR</th>
+
+              <th style="background-color:#dcfce7;color:#166534;font-weight:bold;text-align:right;border:1px solid #cbd5e1;padding:8px;min-width:140px;">Total CTC</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+            ${totalsHtml}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([htmlTable], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Payroll_Register_${periodStr.replace(/ /g, '_')}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   // Single-employee payroll state for Edit mode
@@ -588,18 +690,21 @@ const PayrollForm: React.FC = () => {
     const netSalary = Math.max(0, Math.round(proGross - totalDeductions));
 
     let emrPf = 0;
+    let pfAdminCharges = 0;
     if (proGross > 0) {
       if (salStructure.usePfCap) {
-        emrPf = proBasic > 15000 ? 1950 : Math.round(proBasic * 0.13);
+        emrPf = proBasic > 15000 ? 1800 : Math.round(proBasic * 0.12);
+        pfAdminCharges = proBasic > 15000 ? 150 : Math.round(proBasic * 0.01);
       } else {
-        emrPf = Math.round(proBasic * 0.13);
+        emrPf = Math.round(proBasic * 0.12);
+        pfAdminCharges = Math.round(proBasic * 0.01);
       }
     }
 
     const emrEsic = (proGross > 0 && salStructure.esicCovered === 'Yes' && proGross < 21001) ? Math.round(proGross * 0.0325) : 0;
     const gratuity = proGross > 0 ? Math.round(proBasic * 15 / 26 / 12) : 0;
 
-    const companyAdditionalCost = emrPf + emrEsic + gratuity + lwfCompany;
+    const companyAdditionalCost = emrPf + pfAdminCharges + emrEsic + gratuity + lwfCompany;
     const totalCtc = proGross + companyAdditionalCost;
 
     return {
@@ -621,11 +726,13 @@ const PayrollForm: React.FC = () => {
       totalDeductions,
       netSalary,
       emrPf,
+      pfAdminCharges,
       emrEsic,
       emrGratuity: gratuity,
       emrLwf: lwfCompany,
       companyAdditionalCost,
       totalCtc,
+      baseGrossSalary: salStructure.baseGrossSalary || (baseBasic + baseHra + baseOther + baseBonus + baseLeave + baseAdvance),
       baseBasic,
       baseHra,
       baseOther,
@@ -716,10 +823,20 @@ const PayrollForm: React.FC = () => {
               baseBonus,
               baseLeave,
               baseAdvance,
-              pTax: Number(offerData.pTax) || (baseGross > 0 ? 200 : 0),
-              lwfSelf: Number(offerData.lwfEmployee) || Number(offerData.lwfSelf) || (baseGross > 0 ? 10 : 0),
-              lwfCompany: Number(offerData.lwfEmployer) || Number(offerData.lwfCompany) || (baseGross > 0 ? 20 : 0),
-              usePfCap: offerData.usePfCap !== undefined ? Boolean(offerData.usePfCap) : true,
+              pTax: (offerData.pTax !== undefined && offerData.pTax !== null && offerData.pTax !== '') 
+                ? Number(offerData.pTax) 
+                : ((offerData.tax !== undefined && offerData.tax !== null && offerData.tax !== '') ? Number(offerData.tax) : (baseGross > 0 ? 200 : 0)),
+              lwfSelf: (offerData.lwfEmployee !== undefined && offerData.lwfEmployee !== null && offerData.lwfEmployee !== '') 
+                ? Number(offerData.lwfEmployee) 
+                : ((offerData.lwfSelf !== undefined && offerData.lwfSelf !== null && offerData.lwfSelf !== '') ? Number(offerData.lwfSelf) : (baseGross > 0 ? 10 : 0)),
+              lwfCompany: (offerData.lwfEmployer !== undefined && offerData.lwfEmployer !== null && offerData.lwfEmployer !== '') 
+                ? Number(offerData.lwfEmployer) 
+                : ((offerData.lwfCompany !== undefined && offerData.lwfCompany !== null && offerData.lwfCompany !== '') ? Number(offerData.lwfCompany) : (baseGross > 0 ? 20 : 0)),
+              usePfCap: offerData.usePfCap !== undefined 
+                ? Boolean(offerData.usePfCap) 
+                : ((offerData.emyPF !== undefined && Number(offerData.basicSalary || baseBasic) > 15000) 
+                    ? (Number(offerData.emyPF) <= 1800) 
+                    : true),
               esicCovered: offerData.esicCovered || 'No',
               calculationBasis: offerData.calculationBasis || 'Old Basis'
             };
@@ -778,10 +895,20 @@ const PayrollForm: React.FC = () => {
               baseBonus,
               baseLeave,
               baseAdvance,
-              pTax: Number(offerData.pTax) || (baseGross > 0 ? 200 : 0),
-              lwfSelf: Number(offerData.lwfEmployee) || Number(offerData.lwfSelf) || (baseGross > 0 ? 10 : 0),
-              lwfCompany: Number(offerData.lwfEmployer) || Number(offerData.lwfCompany) || (baseGross > 0 ? 20 : 0),
-              usePfCap: offerData.usePfCap !== undefined ? Boolean(offerData.usePfCap) : true,
+              pTax: (offerData.pTax !== undefined && offerData.pTax !== null && offerData.pTax !== '') 
+                ? Number(offerData.pTax) 
+                : ((offerData.tax !== undefined && offerData.tax !== null && offerData.tax !== '') ? Number(offerData.tax) : (baseGross > 0 ? 20 : 0)),
+              lwfSelf: (offerData.lwfEmployee !== undefined && offerData.lwfEmployee !== null && offerData.lwfEmployee !== '') 
+                ? Number(offerData.lwfEmployee) 
+                : ((offerData.lwfSelf !== undefined && offerData.lwfSelf !== null && offerData.lwfSelf !== '') ? Number(offerData.lwfSelf) : (baseGross > 0 ? 10 : 0)),
+              lwfCompany: (offerData.lwfEmployer !== undefined && offerData.lwfEmployer !== null && offerData.lwfEmployer !== '') 
+                ? Number(offerData.lwfEmployer) 
+                : ((offerData.lwfCompany !== undefined && offerData.lwfCompany !== null && offerData.lwfCompany !== '') ? Number(offerData.lwfCompany) : (baseGross > 0 ? 20 : 0)),
+              usePfCap: offerData.usePfCap !== undefined 
+                ? Boolean(offerData.usePfCap) 
+                : ((offerData.emyPF !== undefined && Number(offerData.basicSalary || baseBasic) > 15000) 
+                    ? (Number(offerData.emyPF) <= 1800) 
+                    : true),
               esicCovered: offerData.esicCovered || 'No',
               calculationBasis: offerData.calculationBasis || 'Old Basis'
             };
@@ -999,12 +1126,12 @@ const PayrollForm: React.FC = () => {
             baseBonus: calcRes.baseBonus || 0,
             baseLeave: calcRes.baseLeave || 0,
             baseAdvance: calcRes.baseAdvance || 0,
-            baseGrossSalary: calcRes.baseGrossSalary || 0,
+            baseGrossSalary: calcRes.baseGrossSalary || (calcRes.baseBasic + calcRes.baseHra + calcRes.baseOther + calcRes.baseBonus + calcRes.baseLeave + calcRes.baseAdvance),
             basicSalary: calcRes.basicSalary || 0,
             allowances: calcRes.allowances || { hra: 0, transport: 0, medical: 0, other: 0, advanceBonus: 0 },
             deductions: calcRes.deductions || { pf: 0, esi: 0, tax: 0, other: 0, tds: 0, covidInsurance: 0 },
             emrPf: calcRes.emrPf || 0,
-            pfAdminCharges,
+            pfAdminCharges: calcRes.pfAdminCharges || 0,
             emrEsic: calcRes.emrEsic || 0,
             emrLwf: calcRes.emrLwf || 0,
             emrGratuity: calcRes.emrGratuity || 0,
@@ -1726,7 +1853,7 @@ const PayrollForm: React.FC = () => {
                     const netAmt = row.netSalary ?? Math.max(0, proGross - totDedn);
 
                     const emrPf = row.emrPf ?? 0;
-                    const pfAdmin = row.pfAdminCharges ?? (proBasic > 0 ? Math.round(proBasic * 0.01) : 0);
+                    const pfAdmin = row.pfAdminCharges ?? 0;
                     const emrEsic = row.emrEsic ?? 0;
                     const emrLwf = row.emrLwf ?? 0;
                     const gratuity = row.emrGratuity ?? 0;
@@ -1751,7 +1878,7 @@ const PayrollForm: React.FC = () => {
                         <TableCell align="right">{row.baseLeave ? `₹${row.baseLeave.toLocaleString('en-IN')}` : '-'}</TableCell>
                         <TableCell align="right">{row.baseAdvance ? `₹${row.baseAdvance.toLocaleString('en-IN')}` : '-'}</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 'bold', bgcolor: '#f0f7ff', borderRight: '2px solid #93c5fd' }}>
-                          ₹{(row.baseGrossSalary ?? 0).toLocaleString('en-IN')}
+                          ₹{(row.baseGrossSalary || ((row.baseBasic ?? 0) + (row.baseHra ?? 0) + (row.baseOther ?? 0) + (row.baseBonus ?? 0) + (row.baseLeave ?? 0) + (row.baseAdvance ?? 0))).toLocaleString('en-IN')}
                         </TableCell>
 
                         {/* Earned Wages */}

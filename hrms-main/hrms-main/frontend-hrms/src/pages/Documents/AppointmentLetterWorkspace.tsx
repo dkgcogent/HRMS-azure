@@ -293,6 +293,7 @@ const AppointmentLetterWorkspace: React.FC = () => {
       monthlyCTC: totalCtcMonth,
       yearlyCTC: totalCtcYear,
       ctcWord,
+      usePfCap: salaryInputs.usePfCap,
       calculationBasis: 'Old Basis',
       esicCovered: grossMonth < 21001 ? 'Yes' : 'No',
       acceptanceCandidateName: prev.acceptanceCandidateName || prev.candidateName
