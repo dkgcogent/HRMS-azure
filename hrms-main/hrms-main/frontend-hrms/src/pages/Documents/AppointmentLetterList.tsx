@@ -31,6 +31,7 @@ import {
     Add as AddIcon,
     Search as SearchIcon,
     Visibility as ViewIcon,
+    Edit as EditIcon,
     Delete as DeleteIcon,
     Send as SendIcon,
     Download as DownloadIcon,
@@ -176,10 +177,31 @@ const AppointmentLetterList: React.FC = () => {
         setIdToDelete(null);
     };
 
-    const handleSendClick = (letter: AppointmentLetter) => {
-        setSelectedLetter(letter);
-        setSelectedEmployeeId(letter.employee_id || '');
-        setSendDialogOpen(true);
+    const handleSendClick = async (letter: AppointmentLetter) => {
+        if (letter.employee_id) {
+            const emp = employees.find(e => e.id === letter.employee_id);
+            const empName = emp ? `${emp.firstName} ${emp.lastName}` : letter.candidate_name;
+            const confirmed = window.confirm(`Send this appointment letter to ${empName}? It will become visible in their portal.`);
+            if (!confirmed) return;
+
+            try {
+                setLoading(true);
+                await api.put(`/api/appointment-letters/${letter.id}/status`, {
+                    status: 'Sent',
+                    employeeId: letter.employee_id
+                });
+                fetchAppointmentLetters();
+            } catch (error) {
+                console.error('Error sending letter:', error);
+                alert('Failed to send appointment letter');
+            } finally {
+                setLoading(false);
+            }
+        } else {
+            setSelectedLetter(letter);
+            setSelectedEmployeeId('');
+            setSendDialogOpen(true);
+        }
     };
 
     const handleSendConfirm = async () => {
@@ -198,7 +220,7 @@ const AppointmentLetterList: React.FC = () => {
             fetchAppointmentLetters();
         } catch (error) {
             console.error('Error sending letter:', error);
-            alert('Failed to assign letter');
+            alert('Failed to send letter');
         } finally {
             setLoading(false);
         }
@@ -357,27 +379,41 @@ const AppointmentLetterList: React.FC = () => {
                                         />
                                     </TableCell>
                                     <TableCell align="center">
-                                        <Tooltip title="View PDF">
-                                            <IconButton size="small" color="primary" onClick={() => handleView(letter.pdf_path)}>
-                                                <ViewIcon />
-                                            </IconButton>
+                                        <Tooltip title={letter.status === 'Accepted' ? "Cannot edit accepted appointment letter" : "Edit Appointment Letter"}>
+                                            <span>
+                                                <IconButton 
+                                                    size="small" 
+                                                    color="primary" 
+                                                    disabled={letter.status === 'Accepted'}
+                                                    onClick={() => navigate(`/documents/appointment-letter/edit/${letter.id}`)}
+                                                >
+                                                    <EditIcon />
+                                                </IconButton>
+                                            </span>
                                         </Tooltip>
                                         <Tooltip title="Download PDF">
                                             <IconButton size="small" sx={{ color: '#0288d1' }} onClick={() => handleDownload(letter.pdf_path, letter.candidate_name)}>
                                                 <DownloadIcon />
                                             </IconButton>
                                         </Tooltip>
-                                        {(letter.status === 'Draft' || letter.status === 'Sent' || letter.status === 'Viewed') && (
-                                            <Tooltip title="Assign to Employee">
+                                        {letter.status === 'Draft' && (
+                                            <Tooltip title="Send to Employee">
                                                 <IconButton size="small" color="success" onClick={() => handleSendClick(letter)}>
                                                     <SendIcon />
                                                 </IconButton>
                                             </Tooltip>
                                         )}
-                                        <Tooltip title="Delete">
-                                            <IconButton size="small" color="error" onClick={() => handleDeleteClick(letter.id)}>
-                                                <DeleteIcon />
-                                            </IconButton>
+                                        <Tooltip title={letter.status === 'Accepted' ? "Cannot delete accepted appointment letter" : "Delete"}>
+                                            <span>
+                                                <IconButton 
+                                                    size="small" 
+                                                    color="error" 
+                                                    disabled={letter.status === 'Accepted'}
+                                                    onClick={() => handleDeleteClick(letter.id)}
+                                                >
+                                                    <DeleteIcon />
+                                                </IconButton>
+                                            </span>
                                         </Tooltip>
                                     </TableCell>
                                     <TableCell align="center">
@@ -432,11 +468,26 @@ const AppointmentLetterList: React.FC = () => {
                             label="Employee"
                             onChange={(e) => setSelectedEmployeeId(e.target.value)}
                         >
-                            {employees.map((emp) => (
-                                <MenuItem key={emp.id} value={emp.id}>
-                                    {emp.firstName} {emp.lastName} ({emp.employeeId})
-                                </MenuItem>
-                            ))}
+                            {(() => {
+                                const assignableEmployees = employees.filter((emp) => {
+                                    if (selectedLetter && selectedLetter.employee_id === emp.id) return true;
+                                    return !letters.some((letter) => letter.employee_id === emp.id);
+                                });
+
+                                if (assignableEmployees.length === 0) {
+                                    return (
+                                        <MenuItem disabled value="">
+                                            <em>All employees are already assigned</em>
+                                        </MenuItem>
+                                    );
+                                }
+
+                                return assignableEmployees.map((emp) => (
+                                    <MenuItem key={emp.id} value={emp.id}>
+                                        {emp.firstName} {emp.lastName} ({emp.employeeId})
+                                    </MenuItem>
+                                ));
+                            })()}
                         </Select>
                     </FormControl>
                 </DialogContent>

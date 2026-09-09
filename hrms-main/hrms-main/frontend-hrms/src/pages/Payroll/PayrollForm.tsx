@@ -27,6 +27,13 @@ import {
   Tooltip,
   IconButton,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Checkbox,
+  FormControlLabel,
+  InputAdornment,
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -37,6 +44,10 @@ import {
   Download as DownloadIcon,
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
+  Search as SearchIcon,
+  Close as CloseIcon,
+  CalendarMonth as CalendarMonthIcon,
+  People as PeopleIcon,
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiService, API_BASE_URL } from '../../services/api';
@@ -212,6 +223,12 @@ const PayrollForm: React.FC = () => {
       };
     }
   });
+
+  // Payslip Selection Card / Modal State
+  const [isPayslipModalOpen, setIsPayslipModalOpen] = useState<boolean>(false);
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<number[]>([]);
+  const [payslipSelectionDate, setPayslipSelectionDate] = useState<string>(() => fromDate ? fromDate.substring(0, 7) : firstDayStr.substring(0, 7));
+  const [empSearchQuery, setEmpSearchQuery] = useState<string>('');
 
   useEffect(() => {
     sessionStorage.setItem('bulkPayroll_fromDate', fromDate);
@@ -1185,8 +1202,8 @@ const PayrollForm: React.FC = () => {
     }
   };
 
-  // Bulk Payslip PDF Generation handler
-  const handleGenerateBulkPayslips = async () => {
+  // Handler to open the Payslip Generation Card/Dialog
+  const handleOpenPayslipModal = () => {
     if (batchRecords.length === 0) {
       setSnackbar({ open: true, message: 'No payroll records found to generate payslips.', severity: 'warning' });
       return;
@@ -1194,7 +1211,40 @@ const PayrollForm: React.FC = () => {
 
     const validRecords = batchRecords.filter(r => r.payrollStatus !== 'FAILED');
     if (validRecords.length === 0) {
-      setSnackbar({ open: true, message: 'No valid payroll records found for payslip PDF generation.', severity: 'warning' });
+      setSnackbar({ open: true, message: 'No valid payroll records found for payslip generation.', severity: 'warning' });
+      return;
+    }
+
+    // Default select all valid employee records
+    setSelectedEmployeeIds(validRecords.map(r => r.employeeId));
+    if (fromDate) {
+      setPayslipSelectionDate(fromDate.substring(0, 7));
+    }
+    setEmpSearchQuery('');
+    setIsPayslipModalOpen(true);
+  };
+
+  // Toggle All / Uncheck All handler
+  const handleToggleSelectAll = (checked: boolean) => {
+    const validRecords = batchRecords.filter(r => r.payrollStatus !== 'FAILED');
+    if (checked) {
+      setSelectedEmployeeIds(validRecords.map(r => r.employeeId));
+    } else {
+      setSelectedEmployeeIds([]);
+    }
+  };
+
+  // Toggle individual employee selection
+  const handleToggleEmployee = (empId: number) => {
+    setSelectedEmployeeIds(prev =>
+      prev.includes(empId) ? prev.filter(id => id !== empId) : [...prev, empId]
+    );
+  };
+
+  // Proceed button handler: generate payslips for selected employees and chosen date
+  const handleProceedGeneratePayslips = async () => {
+    if (selectedEmployeeIds.length === 0) {
+      setSnackbar({ open: true, message: 'Please select at least one employee.', severity: 'warning' });
       return;
     }
 
@@ -1203,21 +1253,32 @@ const PayrollForm: React.FC = () => {
       let payslipsCount = 0;
       let payslipFailures = 0;
 
+      const [selectedYearStr, selectedMonthStr] = (payslipSelectionDate || fromDate.substring(0, 7)).split('-');
+      const customYear = parseInt(selectedYearStr, 10);
+      const customMonth = parseInt(selectedMonthStr, 10);
+
       const updatedRecords = [...batchRecords];
+      const recordsToProcess = updatedRecords.filter(
+        r => selectedEmployeeIds.includes(r.employeeId) && r.payrollStatus !== 'FAILED'
+      );
 
-      for (let i = 0; i < updatedRecords.length; i++) {
-        const rec = updatedRecords[i];
-        if (rec.payrollStatus === 'FAILED') continue;
-
-        setProgressText(`Generating Payslip PDF ${i + 1} of ${updatedRecords.length}: ${rec.employeeName}`);
+      for (let i = 0; i < recordsToProcess.length; i++) {
+        const rec = recordsToProcess[i];
+        setProgressText(`Generating Payslip PDF ${i + 1} of ${recordsToProcess.length}: ${rec.employeeName}`);
 
         try {
           let finalPayslipId = rec.payslipId;
-          if (rec.payrollPayload) {
+          const payloadToUse = rec.payrollPayload ? {
+            ...rec.payrollPayload,
+            month: !isNaN(customMonth) ? customMonth : rec.payrollPayload.month,
+            year: !isNaN(customYear) ? customYear : rec.payrollPayload.year,
+          } : null;
+
+          if (payloadToUse) {
             if (finalPayslipId) {
-              await apiService.updatePayslip(finalPayslipId, rec.payrollPayload as any);
+              await apiService.updatePayslip(finalPayslipId, payloadToUse as any);
             } else {
-              const createRes = await apiService.createPayslip(rec.payrollPayload as any);
+              const createRes = await apiService.createPayslip(payloadToUse as any);
               finalPayslipId = createRes.id || (createRes.data ? createRes.data.id : undefined);
               rec.payslipId = finalPayslipId;
             }
@@ -1234,7 +1295,10 @@ const PayrollForm: React.FC = () => {
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `Payslip_${rec.employeeName.replace(/\s+/g, '_')}_${rec.month}_${rec.year}.pdf`;
+            const monthName = !isNaN(customMonth)
+              ? new Date(customYear, customMonth - 1).toLocaleString('default', { month: 'short' })
+              : rec.month;
+            link.download = `Payslip_${rec.employeeName.replace(/\s+/g, '_')}_${monthName}_${customYear || rec.year}.pdf`;
             document.body.appendChild(link);
             link.click();
             link.remove();
@@ -1258,13 +1322,15 @@ const PayrollForm: React.FC = () => {
       setBatchRecords(updatedRecords);
       setSummaryStats(prev => ({
         ...prev,
-        payslipsGenerated: payslipsCount,
+        payslipsGenerated: prev.payslipsGenerated + payslipsCount,
         failedCount: prev.failedCount + payslipFailures
       }));
 
+      setIsPayslipModalOpen(false);
+
       setSnackbar({
         open: true,
-        message: `Payslips generated successfully for ${payslipsCount} employees!`,
+        message: `Payslips generated successfully for ${payslipsCount} selected employee(s)!`,
         severity: payslipFailures === 0 ? 'success' : 'warning'
       });
     } catch (error: any) {
@@ -1941,7 +2007,7 @@ const PayrollForm: React.FC = () => {
                   size="large"
                   startIcon={isGeneratingPayslips ? <CircularProgress size={20} color="inherit" /> : <PictureAsPdfIcon />}
                   disabled={isProcessing || isGeneratingPayslips || batchRecords.length === 0}
-                  onClick={handleGenerateBulkPayslips}
+                  onClick={handleOpenPayslipModal}
                   sx={{
                     px: 4,
                     py: 1.2,
@@ -1957,6 +2023,311 @@ const PayrollForm: React.FC = () => {
           )}
         </Paper>
       )}
+
+      {/* Payslip Generation Selection Modal / Card */}
+      <Dialog
+        open={isPayslipModalOpen}
+        onClose={() => !isGeneratingPayslips && setIsPayslipModalOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+            overflow: 'hidden',
+          },
+        }}
+      >
+        {/* Header */}
+        <DialogTitle
+          sx={{
+            background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
+            color: 'white',
+            px: 3,
+            py: 2.5,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <PictureAsPdfIcon sx={{ fontSize: 28, color: '#f472b6' }} />
+            <Box>
+              <Typography variant="h6" fontWeight="bold" sx={{ color: 'white', lineHeight: 1.2 }}>
+                Generate Payslips
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+                Select employees and payout month to generate and download PDF payslips
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton
+            onClick={() => !isGeneratingPayslips && setIsPayslipModalOpen(false)}
+            sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}
+            disabled={isGeneratingPayslips}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 3, bgcolor: '#f8fafc' }}>
+          {/* Controls Bar */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              mb: 2.5,
+              borderRadius: 2,
+              bgcolor: '#ffffff',
+              border: '1px solid #e2e8f0',
+            }}
+          >
+            <Grid container spacing={2} alignItems="center">
+              {/* Date of Selection */}
+              <Grid size={{ xs: 12, sm: 5 }}>
+                <TextField
+                  fullWidth
+                  label="Select Payout Month / Date"
+                  type="month"
+                  size="small"
+                  value={payslipSelectionDate}
+                  onChange={(e) => setPayslipSelectionDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  disabled={isGeneratingPayslips}
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <CalendarMonthIcon color="primary" fontSize="small" />
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
+              </Grid>
+
+              {/* Employee Search Box */}
+              <Grid size={{ xs: 12, sm: 7 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="Search by name, ID or department..."
+                  value={empSearchQuery}
+                  onChange={(e) => setEmpSearchQuery(e.target.value)}
+                  disabled={isGeneratingPayslips}
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon color="action" fontSize="small" />
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
+              </Grid>
+            </Grid>
+          </Paper>
+
+          {/* Master Checkbox & Selection Summary Card */}
+          <Card
+            elevation={0}
+            sx={{
+              mb: 2,
+              borderRadius: 2,
+              border: '1px solid #e2e8f0',
+              bgcolor: '#ffffff',
+            }}
+          >
+            <Box
+              sx={{
+                px: 2,
+                py: 1.5,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 1,
+                bgcolor: '#f1f5f9',
+                borderBottom: '1px solid #e2e8f0',
+              }}
+            >
+              {(() => {
+                const validRecords = batchRecords.filter(r => r.payrollStatus !== 'FAILED');
+                const isAllSelected = validRecords.length > 0 && selectedEmployeeIds.length === validRecords.length;
+                const isIndeterminate = selectedEmployeeIds.length > 0 && selectedEmployeeIds.length < validRecords.length;
+
+                return (
+                  <>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={isAllSelected}
+                          indeterminate={isIndeterminate}
+                          onChange={(e) => handleToggleSelectAll(e.target.checked)}
+                          disabled={isGeneratingPayslips || validRecords.length === 0}
+                          color="primary"
+                        />
+                      }
+                      label={
+                        <Typography variant="subtitle2" fontWeight="bold" sx={{ color: '#1e293b' }}>
+                          Select All / Uncheck All
+                        </Typography>
+                      }
+                    />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Chip
+                        icon={<PeopleIcon />}
+                        label={`${selectedEmployeeIds.length} of ${validRecords.length} Selected`}
+                        color={selectedEmployeeIds.length > 0 ? 'primary' : 'default'}
+                        variant={selectedEmployeeIds.length > 0 ? 'filled' : 'outlined'}
+                        size="small"
+                        sx={{ fontWeight: 'bold' }}
+                      />
+                    </Box>
+                  </>
+                );
+              })()}
+            </Box>
+
+            {/* Employee List Table */}
+            <TableContainer sx={{ maxHeight: 320 }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell padding="checkbox" sx={{ bgcolor: '#f8fafc', fontWeight: 'bold' }}>
+                      Select
+                    </TableCell>
+                    <TableCell sx={{ bgcolor: '#f8fafc', fontWeight: 'bold' }}>Employee Name & Code</TableCell>
+                    <TableCell sx={{ bgcolor: '#f8fafc', fontWeight: 'bold' }}>Department / Role</TableCell>
+                    <TableCell align="right" sx={{ bgcolor: '#f8fafc', fontWeight: 'bold' }}>Net Salary</TableCell>
+                    <TableCell align="center" sx={{ bgcolor: '#f8fafc', fontWeight: 'bold' }}>Status</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(() => {
+                    const validRecords = batchRecords.filter(r => r.payrollStatus !== 'FAILED');
+                    const filteredRecords = validRecords.filter(r => {
+                      if (!empSearchQuery) return true;
+                      const q = empSearchQuery.toLowerCase();
+                      return (
+                        (r.employeeName && r.employeeName.toLowerCase().includes(q)) ||
+                        (r.employeeCode && r.employeeCode.toLowerCase().includes(q)) ||
+                        (r.department && r.department.toLowerCase().includes(q)) ||
+                        (r.designation && r.designation.toLowerCase().includes(q))
+                      );
+                    });
+
+                    if (filteredRecords.length === 0) {
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                            No employees match your search.
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+
+                    return filteredRecords.map((record) => {
+                      const isSelected = selectedEmployeeIds.includes(record.employeeId);
+                      return (
+                        <TableRow
+                          key={record.employeeId}
+                          hover
+                          onClick={() => !isGeneratingPayslips && handleToggleEmployee(record.employeeId)}
+                          sx={{
+                            cursor: isGeneratingPayslips ? 'default' : 'pointer',
+                            bgcolor: isSelected ? 'rgba(30, 60, 114, 0.04)' : 'inherit',
+                          }}
+                        >
+                          <TableCell padding="checkbox">
+                            <Checkbox
+                              checked={isSelected}
+                              disabled={isGeneratingPayslips}
+                              color="primary"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight="bold" sx={{ color: '#0f172a' }}>
+                              {record.employeeName}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {record.employeeCode}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" color="text.primary">
+                              {record.designation || 'N/A'}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {record.department || 'N/A'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography variant="body2" fontWeight="bold" sx={{ color: '#059669' }}>
+                              ₹{record.netSalary ? record.netSalary.toLocaleString('en-IN') : '0'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            {record.payslipGenerated ? (
+                              <Chip label="Generated" color="success" size="small" variant="outlined" />
+                            ) : (
+                              <Chip label="Ready" color="info" size="small" variant="outlined" />
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    });
+                  })()}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Card>
+
+          {/* Progress Indicator inside Modal */}
+          {isGeneratingPayslips && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="body2" sx={{ mb: 1, fontWeight: 'medium', color: 'primary.main' }}>
+                {progressText || 'Generating Payslips...'}
+              </Typography>
+              <LinearProgress color="secondary" sx={{ height: 8, borderRadius: 4 }} />
+            </Box>
+          )}
+        </DialogContent>
+
+        {/* Modal Action Buttons: Cancel and Proceed */}
+        <DialogActions sx={{ px: 3, py: 2, bgcolor: '#f1f5f9', borderTop: '1px solid #e2e8f0', gap: 1 }}>
+          <Button
+            variant="outlined"
+            color="inherit"
+            startIcon={<CancelIcon />}
+            onClick={() => setIsPayslipModalOpen(false)}
+            disabled={isGeneratingPayslips}
+            sx={{ fontWeight: 'bold', px: 3 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={isGeneratingPayslips ? <CircularProgress size={18} color="inherit" /> : <PictureAsPdfIcon />}
+            onClick={handleProceedGeneratePayslips}
+            disabled={isGeneratingPayslips || selectedEmployeeIds.length === 0}
+            sx={{
+              fontWeight: 'bold',
+              px: 4,
+              py: 1,
+              background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
+              boxShadow: '0 4px 12px rgba(30, 60, 114, 0.25)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #152954 0%, #1c3d75 100%)',
+              },
+            }}
+          >
+            {isGeneratingPayslips ? 'Processing Payslips...' : `Proceed (${selectedEmployeeIds.length})`}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Failed Employees Summary Log (if any) */}
       {batchRecords.filter(r => r.payrollStatus === 'FAILED' || r.error).length > 0 && (

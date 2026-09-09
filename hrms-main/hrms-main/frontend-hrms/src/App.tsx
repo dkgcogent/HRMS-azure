@@ -214,6 +214,7 @@ function App() {
               <Route path="/documents/letters" element={<LetterGenerationForm />} />
               <Route path="/documents/appointment-letter" element={<AppointmentLetterList />} />
               <Route path="/documents/appointment-letter/new" element={<AppointmentLetterWorkspace />} />
+              <Route path="/documents/appointment-letter/edit/:id" element={<AppointmentLetterWorkspace />} />
 
               {/* Assets */}
               <Route path="/assets" element={<AssetList />} />

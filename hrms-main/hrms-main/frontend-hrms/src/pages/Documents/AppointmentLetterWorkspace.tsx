@@ -32,7 +32,7 @@ import {
   MonetizationOnOutlined as SalaryIcon,
   FingerprintOutlined as FingerprintIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api, getPublicUrl } from '../../services/api';
 
 // Custom Grid wrapper component to ensure div rendering for standard DKG grid items
@@ -112,8 +112,12 @@ const formatCellVal = (val: any) => {
 
 const AppointmentLetterWorkspace: React.FC = () => {
   const navigate = useNavigate();
+  const { id } = useParams<{ id?: string }>();
+  const isEdit = Boolean(id);
+
   const [loading, setLoading] = useState(false);
   const [employees, setEmployees] = useState<any[]>([]);
+  const [existingLetters, setExistingLetters] = useState<any[]>([]);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [showAnnexure, setShowAnnexure] = useState(true);
 
@@ -184,7 +188,11 @@ const AppointmentLetterWorkspace: React.FC = () => {
 
   useEffect(() => {
     fetchEmployees();
-  }, []);
+    fetchExistingLetters();
+    if (id) {
+      fetchLetterDetails(id);
+    }
+  }, [id]);
 
   const fetchEmployees = async () => {
     try {
@@ -194,6 +202,82 @@ const AppointmentLetterWorkspace: React.FC = () => {
       }
     } catch (e) {
       console.error('Error fetching employees:', e);
+    }
+  };
+
+  const fetchExistingLetters = async () => {
+    try {
+      const res = await api.get('/api/appointment-letters/list');
+      if (res.data.success) {
+        setExistingLetters(res.data.data || []);
+      }
+    } catch (e) {
+      console.error('Error fetching existing appointment letters:', e);
+    }
+  };
+
+  const fetchLetterDetails = async (letterId: string) => {
+    try {
+      setLoading(true);
+      const res = await api.get(`/api/appointment-letters/${letterId}`);
+      if (res.data.success && res.data.data) {
+        const letter = res.data.data;
+        let appData = letter.appointment_data;
+        if (typeof appData === 'string') {
+          try {
+            appData = JSON.parse(appData);
+          } catch (e) {
+            appData = {};
+          }
+        }
+
+        const basicVal = Number(appData.basicSalary || appData.basic || 0);
+        const hraVal = Number(appData.hra || 0);
+        const otherVal = Number(appData.otherAllowances || 0);
+        const leaveVal = Number(appData.leaveEncashment || 0);
+        const advanceVal = Number(appData.advanceBonus || 0);
+        const pTaxVal = Number(appData.pTax || 0);
+        const lwfSelfVal = Number(appData.lwfEmployee || appData.lwfSelf || 0);
+        const lwfCompVal = Number(appData.lwfEmployer || appData.lwfCompany || 0);
+        const uniformVal = Number(appData.uniformCharges || 0);
+        const usePfCapVal = Boolean(appData.usePfCap);
+
+        setSalaryInputs({
+          basic: basicVal,
+          hra: hraVal,
+          otherAllowances: otherVal,
+          leaveEncashment: leaveVal,
+          advanceBonus: advanceVal,
+          pTax: pTaxVal,
+          lwfSelf: lwfSelfVal,
+          lwfCompany: lwfCompVal,
+          usePfCap: usePfCapVal,
+          uniformCharges: uniformVal,
+        });
+
+        if (appData.showAnnexure !== undefined) {
+          setShowAnnexure(Boolean(appData.showAnnexure));
+        }
+
+        setFormData(prev => ({
+          ...prev,
+          ...appData,
+          candidateName: appData.candidateName || letter.candidate_name || '',
+          designation: appData.designation || letter.designation || '',
+          joiningDate: appData.joiningDate || (letter.joining_date ? letter.joining_date.split('T')[0] : ''),
+          date: appData.date || (letter.generated_date ? letter.generated_date.split('T')[0] : prev.date),
+          employeeId: letter.employee_id || appData.employeeId || null,
+        }));
+      }
+    } catch (err) {
+      console.error('Error fetching appointment letter details:', err);
+      setSnackbar({
+        open: true,
+        message: 'Failed to load existing appointment letter details.',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -394,18 +478,27 @@ const AppointmentLetterWorkspace: React.FC = () => {
 
     try {
       setLoading(true);
-      await api.post('/api/appointment-letters/generate', { ...formData, showAnnexure });
-      setSnackbar({
-        open: true,
-        message: 'Appointment Letter generated and saved successfully!',
-        severity: 'success'
-      });
+      if (isEdit) {
+        await api.put(`/api/appointment-letters/${id}`, { ...formData, showAnnexure });
+        setSnackbar({
+          open: true,
+          message: 'Appointment Letter updated successfully!',
+          severity: 'success'
+        });
+      } else {
+        await api.post('/api/appointment-letters/generate', { ...formData, showAnnexure });
+        setSnackbar({
+          open: true,
+          message: 'Appointment Letter generated and saved successfully!',
+          severity: 'success'
+        });
+      }
       setTimeout(() => navigate('/documents/appointment-letter'), 1500);
     } catch (e) {
       console.error('Error saving appointment letter:', e);
       setSnackbar({
         open: true,
-        message: 'Error saving Appointment Letter.',
+        message: isEdit ? 'Error updating Appointment Letter.' : 'Error saving Appointment Letter.',
         severity: 'error'
       });
     } finally {
@@ -494,16 +587,20 @@ const AppointmentLetterWorkspace: React.FC = () => {
             Back to Letters
           </Button>
           <Typography variant="h4" fontWeight="bold" sx={{ color: 'primary.main', mb: 0.5 }}>
-            Appointment Letter Workspace
+            {isEdit ? 'Edit Appointment Letter' : 'Appointment Letter Workspace'}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Generate pixel-perfect multi-page appointment letters with automatic salary Annexure-I breakup.
+            {isEdit
+              ? 'Update appointment letter details and regenerate the salary Annexure-I breakup.'
+              : 'Generate pixel-perfect multi-page appointment letters with automatic salary Annexure-I breakup.'}
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1.5 }}>
-          <Button variant="outlined" startIcon={<ClearIcon />} onClick={handleClear}>
-            Clear Form
-          </Button>
+          {!isEdit && (
+            <Button variant="outlined" startIcon={<ClearIcon />} onClick={handleClear}>
+              Clear Form
+            </Button>
+          )}
           <Button variant="outlined" startIcon={<PrintIcon />} onClick={handlePrint}>
             Print / Save
           </Button>
@@ -517,7 +614,7 @@ const AppointmentLetterWorkspace: React.FC = () => {
               background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
             }}
           >
-            {loading ? 'Saving...' : 'Generate & Save'}
+            {loading ? (isEdit ? 'Updating...' : 'Saving...') : (isEdit ? 'Update & Save' : 'Generate & Save')}
           </Button>
         </Box>
       </Box>
@@ -565,11 +662,26 @@ const AppointmentLetterWorkspace: React.FC = () => {
                         label="Load Employee Structure"
                         onChange={(e) => handleEmployeeSelect(Number(e.target.value))}
                       >
-                        {employees.map(e => (
-                          <MenuItem key={e.id} value={e.id}>
-                            {e.firstName} {e.lastName} ({e.employeeId})
-                          </MenuItem>
-                        ))}
+                        {(() => {
+                          const availableEmployees = employees.filter(emp => {
+                            if (formData.employeeId && emp.id === formData.employeeId) return true;
+                            return !existingLetters.some(letter => letter.employee_id === emp.id);
+                          });
+
+                          if (availableEmployees.length === 0) {
+                            return (
+                              <MenuItem disabled value="">
+                                <em>All employees already have an appointment letter</em>
+                              </MenuItem>
+                            );
+                          }
+
+                          return availableEmployees.map(e => (
+                            <MenuItem key={e.id} value={e.id}>
+                              {e.firstName} {e.lastName} ({e.employeeId})
+                            </MenuItem>
+                          ));
+                        })()}
                       </Select>
                     </FormControl>
                   </Grid>

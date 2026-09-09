@@ -105,7 +105,7 @@ const PayslipList: React.FC = () => {
                     variant="contained"
                     color="primary"
                     startIcon={<AddIcon />}
-                    onClick={() => navigate('/payslips/create')}
+                    onClick={() => navigate('/payroll')}
                 >
                     Generate Payslip
                 </Button>
