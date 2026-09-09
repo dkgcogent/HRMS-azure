@@ -91,23 +91,10 @@ const formatCellValPDF = (val: any): string => {
 
 
 /**
- * Generate Appointment Letter PDF
+ * Build Appointment Letter PDF Buffer
  */
-export const generateAppointmentLetterPDF = async (req: Request, res: Response) => {
-    try {
-        const formData: AppointmentLetterData = req.body;
-        const showAnnexure = req.body.showAnnexure !== false; // Default to true if not provided
-
-        if (!formData.candidateName || !formData.designation || !formData.joiningDate) {
-            return res.status(400).json({
-                success: false,
-                message: 'Missing required fields'
-            });
-        }
-
-        const fileName = `Appointment_Letter_${formData.candidateName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-
-        // Create PDF document
+const createAppointmentLetterPDFBuffer = (formData: AppointmentLetterData, showAnnexure: boolean): Promise<Buffer> => {
+    return new Promise((resolve, reject) => {
         const doc = new PDFDocument({
             size: 'A4',
             margins: { top: 50, bottom: 50, left: 72, right: 72 }
@@ -115,6 +102,8 @@ export const generateAppointmentLetterPDF = async (req: Request, res: Response) 
 
         const buffers: Buffer[] = [];
         doc.on('data', buffers.push.bind(buffers));
+        doc.on('end', () => resolve(Buffer.concat(buffers)));
+        doc.on('error', reject);
 
         // ==================== PAGE 1 ====================
         // Reference Number & Date
@@ -281,7 +270,6 @@ export const generateAppointmentLetterPDF = async (req: Request, res: Response) 
         doc.text('Accepted & Agreed', 380, sigY);
 
         // Signatures placement
-
         if (formData.candidateSignature) {
             try {
                 const base64Data = formData.candidateSignature.replace(/^data:image\/\w+;base64,/, '');
@@ -296,248 +284,345 @@ export const generateAppointmentLetterPDF = async (req: Request, res: Response) 
 
         if (!showAnnexure) {
             doc.end();
-        } else {
-            // ==================== PAGE 4 ====================
-            doc.addPage();
-            let annexureY = 150;
-
-            doc.fontSize(12).font('Times-Bold').text('ANNEXURE - I (Salary Breakup Details)', 72, annexureY, { align: 'center', underline: true });
-            doc.fontSize(10).font('Times-Italic').text(`Candidate Name: Mr./Ms. ${formData.candidateName || '...............................'}`, 72, annexureY + 18, { align: 'center' });
-
-            annexureY += 45;
-
-            // Table drawing
-            const tableTop = annexureY;
-            const col1X = 72;
-            const col1Width = 38;
-            const col2Width = 242;
-            const col3Width = 94;
-            const col4Width = 94;
-            const rowHeight = 20;
-
-            const cellX = [
-                col1X,
-                col1X + col1Width,
-                col1X + col1Width + col2Width,
-                col1X + col1Width + col2Width + col3Width
-            ];
-            const cellWidth = [
-                col1Width,
-                col2Width,
-                col3Width,
-                col4Width
-            ];
-
-            // Draw Table Header
-            doc.save();
-            const headerY = tableTop;
-            for (let c = 0; c < 4; c++) {
-                doc.fillColor('#f0f4ff').rect(cellX[c], headerY, cellWidth[c], rowHeight).fill();
-                doc.strokeColor('#000000').lineWidth(0.5).rect(cellX[c], headerY, cellWidth[c], rowHeight).stroke();
-            }
-
-            doc.fillColor('#000000').font('Helvetica-Bold').fontSize(9);
-            doc.text('S.No.', cellX[0] + 8, headerY + 5.5);
-            doc.text('Description', cellX[1] + 8, headerY + 5.5);
-            doc.text('Per Month (₹)', cellX[2], headerY + 5.5, { width: cellWidth[2] - 8, align: 'right' });
-            doc.text('Yearly (₹)', cellX[3], headerY + 5.5, { width: cellWidth[3] - 8, align: 'right' });
-            doc.restore();
-
-            let currentTableY = headerY + rowHeight;
-
-            const basic = Number(formData.basicSalary) || 0;
-            const hra = Number(formData.hra) || 0;
-            const other = Number(formData.otherAllowances) || 0;
-            const bonus = Number(formData.performanceBonus) || 0;
-            const leaveEnc = Number(formData.leaveEncashment) || 0;
-            const advBonus = Number(formData.advanceBonus) || 0;
-            const gross = Number(formData.grossSalary) || 0;
-
-            const emyPF = Number(formData.emyPF) || 0;
-            const emyESIC = Number(formData.emyESIC) || 0;
-            const pTax = Number(formData.pTax) || 0;
-            const uniformCharges = Number(formData.uniformCharges) || 0;
-            const lwfEE = Number(formData.lwfEmployee) || 0;
-
-            const netAmount = Number(formData.netAmount) || 0;
-
-            const emrPF = Number(formData.emrPF) || 0;
-            const emrAdmin = Number(formData.emrAdminCharges) || 0;
-            const emrESIC = Number(formData.emrESIC) || 0;
-            const lwfER = Number(formData.lwfEmployer) || 0;
-            const gratuity = Number(formData.gratuity) || 0;
-            const totalEMR = Number(formData.totalEMRContribution) || 0;
-            const yearlyCtc = Number(formData.yearlyCTC) || 0;
-            const monthlyCTC = Number(formData.monthlyCTC) || 0;
-
-            const salaryData = [
-                // Section I
-                { sno: 'I', desc: 'Basic', monthly: basic, yearly: basic * 12, isBasicRow: true },
-                { sno: '', desc: 'HRA', monthly: hra, yearly: hra * 12 },
-                { sno: '', desc: 'Other Allowances', monthly: other, yearly: other * 12 },
-                { sno: '', desc: 'Monthly_Leave_Encashment', monthly: leaveEnc, yearly: leaveEnc * 12 },
-                { sno: '', desc: 'Advance_Bonus', monthly: advBonus, yearly: advBonus * 12 },
-                { sno: '', desc: 'Gross Salary on Pay Slip (A)', monthly: gross, yearly: gross * 12, highlight: true },
-                // Spacer
-                { sno: '', desc: '', monthly: '', yearly: '', isSpacer: true },
-                // Section II
-                { sno: 'II', desc: 'P.F.Deduction (Self Contribution)', monthly: emyPF, yearly: emyPF * 12, isSectionHeaderRow: true },
-                { sno: '', desc: 'ESI Deduction (Self Contribution)', monthly: emyESIC, yearly: emyESIC * 12 },
-                { sno: '', desc: 'Professional Tax', monthly: pTax, yearly: pTax * 12 },
-                { sno: '', desc: 'Labor Welfare Fund', monthly: lwfEE, yearly: lwfEE * 12 },
-                { sno: '', desc: 'Gross Deduction (B)', monthly: Number(formData.totalDeductions), yearly: Number(formData.totalDeductions) * 12, highlight: true },
-                { sno: '', desc: 'Employee Take Home Salary (C=A-B)', monthly: netAmount, yearly: netAmount * 12, blackRow: true },
-                // Spacer
-                { sno: '', desc: '', monthly: '', yearly: '', isSpacer: true },
-                // Section III
-                { sno: 'III', desc: "P.F.Deduction (Company's Contribution)", monthly: emrPF + emrAdmin, yearly: (emrPF + emrAdmin) * 12, isSectionHeaderRow: true },
-                { sno: '', desc: "ESI Deduction (Company's Contribution)", monthly: emrESIC, yearly: emrESIC * 12 },
-                { sno: '', desc: 'Gratuity *', monthly: gratuity, yearly: gratuity * 12 },
-                { sno: '', desc: 'Uniform Charges', monthly: uniformCharges, yearly: uniformCharges * 12 },
-                { sno: '', desc: 'Labor Welfare Fund', monthly: lwfER, yearly: lwfER * 12 },
-                { sno: '', desc: "Company's Additional Cost", monthly: totalEMR, yearly: totalEMR * 12, highlight: true },
-                { sno: '', desc: 'Total CTC of Company', monthly: monthlyCTC, yearly: yearlyCtc, blackRow: true }
-            ];
-
-            salaryData.forEach((row, rowIndex) => {
-                doc.save();
-
-                // Determine background colors for the 4 cells in this row
-                let bgColors = ['#ffffff', '#ffffff', '#ffffff', '#ffffff'];
-
-                if (row.isSpacer) {
-                    bgColors = ['#fafafa', '#fafafa', '#fafafa', '#fafafa'];
-                } else if (row.blackRow) {
-                    bgColors = ['#222222', '#222222', '#222222', '#222222'];
-                } else if (row.highlight) {
-                    bgColors = ['#e2ebf0', '#e2ebf0', '#e2ebf0', '#e2ebf0'];
-                } else {
-                    bgColors = ['#ffffff', '#ffffff', '#ffffff', '#ffffff'];
-                }
-
-                // Draw background and cell border for each of the 4 cells
-                const currentRowHeight = row.isSpacer ? 6 : rowHeight;
-                for (let c = 0; c < 4; c++) {
-                    doc.fillColor(bgColors[c]).rect(cellX[c], currentTableY, cellWidth[c], currentRowHeight).fill();
-                    doc.strokeColor('#000000').lineWidth(0.5).rect(cellX[c], currentTableY, cellWidth[c], currentRowHeight).stroke();
-                }
-
-                // Draw text if it's not a spacer row
-                if (!row.isSpacer) {
-                    // Determine font weight and text colors
-                    let textColors = ['#000000', '#000000', '#000000', '#000000'];
-                    let isBold = [false, false, false, false];
-
-                    if (row.blackRow) {
-                        textColors = ['#ffffff', '#ffffff', '#ffffff', '#ffffff'];
-                        isBold = [true, true, true, true];
-                    } else if (row.highlight) {
-                        textColors = ['#000000', '#000000', '#000000', '#000000'];
-                        isBold = [true, true, true, true];
-                    } else if (row.isBasicRow || row.isSectionHeaderRow) {
-                        textColors = ['#000000', '#000000', '#000000', '#000000'];
-                        isBold = [true, true, false, true];
-                    } else {
-                        textColors = ['#000000', '#000000', '#000000', '#000000'];
-                        isBold = [false, false, false, false];
-                    }
-
-                    const textY = currentTableY + 5.5;
-
-                    // Draw S.No
-                    if (row.sno) {
-                        doc.fillColor(textColors[0])
-                            .font(isBold[0] ? 'Helvetica-Bold' : 'Helvetica')
-                            .fontSize(8.5)
-                            .text(row.sno, cellX[0] + 8, textY);
-                    }
-
-                    // Draw Description
-                    doc.fillColor(textColors[1])
-                        .font(isBold[1] ? 'Helvetica-Bold' : 'Helvetica')
-                        .fontSize(8.5)
-                        .text(row.desc, cellX[1] + 8, textY);
-
-                    // Draw Per Month Value
-                    const monthlyText = formatCellValPDF(row.monthly);
-                    doc.fillColor(textColors[2])
-                        .font(isBold[2] ? 'Helvetica-Bold' : 'Helvetica')
-                        .fontSize(8.5)
-                        .text(monthlyText, cellX[2], textY, { width: cellWidth[2] - 8, align: 'right' });
-
-                    // Draw Yearly Value
-                    const yearlyText = formatCellValPDF(row.yearly);
-                    doc.fillColor(textColors[3])
-                        .font(isBold[3] ? 'Helvetica-Bold' : 'Helvetica')
-                        .fontSize(8.5)
-                        .text(yearlyText, cellX[3], textY, { width: cellWidth[3] - 8, align: 'right' });
-                }
-
-                doc.restore();
-                currentTableY += currentRowHeight;
-            });
-
-            // Draw Gratuity Note at the bottom of the table
-            doc.save();
-            const totalWidth = col1Width + col2Width + col3Width + col4Width;
-            doc.fillColor('#ffffff').rect(cellX[0], currentTableY, totalWidth, rowHeight).fill();
-            doc.strokeColor('#000000').lineWidth(0.5).rect(cellX[0], currentTableY, totalWidth, rowHeight).stroke();
-            doc.fillColor('#000000').font('Helvetica-Bold').fontSize(8.5).text('* Gratuity - will be applicable after continuous 5 years of service as per the applicable laws.', cellX[0] + 8, currentTableY + 5.5);
-            doc.restore();
-
-            doc.end();
+            return;
         }
 
-        doc.on('end', async () => {
-            try {
-                const pdfData = Buffer.concat(buffers);
-                const blobName = await uploadBufferToBlob(pdfData, fileName, 'pdfs/', 'application/pdf');
-                const webPath = getBlobUrl(blobName);
+        // ==================== PAGE 4 ====================
+        doc.addPage();
+        let annexureY = 150;
 
-                // Write db record
-                const [result] = await pool.query<ResultSetHeader>(
-                    `INSERT INTO hrms_appointment_letters 
-                    (candidate_name, employee_id, designation, generated_date, joining_date, status, monthly_ctc, yearly_ctc, email, phone, appointment_data, pdf_path) 
-                    VALUES (?, ?, ?, ?, ?, 'Draft', ?, ?, ?, ?, ?, ?)`,
-                    [
-                        formData.candidateName,
-                        formData.employeeId,
-                        formData.designation,
-                        formData.date,
-                        formData.joiningDate,
-                        formData.monthlyCTC,
-                        formData.yearlyCTC,
-                        formData.email || null,
-                        formData.phone || null,
-                        JSON.stringify(formData),
-                        webPath
-                    ]
-                );
+        doc.fontSize(12).font('Times-Bold').text('ANNEXURE - I (Salary Breakup Details)', 72, annexureY, { align: 'center', underline: true });
+        doc.fontSize(10).font('Times-Italic').text(`Candidate Name: Mr./Ms. ${formData.candidateName || '...............................'}`, 72, annexureY + 18, { align: 'center' });
 
-                res.setHeader('Content-Type', 'application/pdf');
-                res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-                res.setHeader('Content-Length', pdfData.length);
-                res.setHeader('X-Offer-Letter-Id', result.insertId.toString());
-                res.setHeader('Access-Control-Expose-Headers', 'X-Offer-Letter-Id');
-                res.send(pdfData);
+        annexureY += 45;
 
-            } catch (dbError: any) {
-                console.error('Error saving appointment letter:', dbError);
-                import('fs').then(fs => fs.writeFileSync('backend-hrms-db-error.log', dbError.stack || dbError.message));
-                res.status(500).json({ success: false, message: 'DB Error saving appointment letter', error: dbError.message, stack: dbError.stack });
+        // Table drawing
+        const tableTop = annexureY;
+        const col1X = 72;
+        const col1Width = 38;
+        const col2Width = 242;
+        const col3Width = 94;
+        const col4Width = 94;
+        const rowHeight = 20;
+
+        const cellX = [
+            col1X,
+            col1X + col1Width,
+            col1X + col1Width + col2Width,
+            col1X + col1Width + col2Width + col3Width
+        ];
+        const cellWidth = [
+            col1Width,
+            col2Width,
+            col3Width,
+            col4Width
+        ];
+
+        // Draw Table Header
+        doc.save();
+        const headerY = tableTop;
+        for (let c = 0; c < 4; c++) {
+            doc.fillColor('#f0f4ff').rect(cellX[c], headerY, cellWidth[c], rowHeight).fill();
+            doc.strokeColor('#000000').lineWidth(0.5).rect(cellX[c], headerY, cellWidth[c], rowHeight).stroke();
+        }
+
+        doc.fillColor('#000000').font('Helvetica-Bold').fontSize(9);
+        doc.text('S.No.', cellX[0] + 8, headerY + 5.5);
+        doc.text('Description', cellX[1] + 8, headerY + 5.5);
+        doc.text('Per Month (₹)', cellX[2], headerY + 5.5, { width: cellWidth[2] - 8, align: 'right' });
+        doc.text('Yearly (₹)', cellX[3], headerY + 5.5, { width: cellWidth[3] - 8, align: 'right' });
+        doc.restore();
+
+        let currentTableY = headerY + rowHeight;
+
+        const basic = Number(formData.basicSalary) || 0;
+        const hra = Number(formData.hra) || 0;
+        const other = Number(formData.otherAllowances) || 0;
+        const bonus = Number(formData.performanceBonus) || 0;
+        const leaveEnc = Number(formData.leaveEncashment) || 0;
+        const advBonus = Number(formData.advanceBonus) || 0;
+        const gross = Number(formData.grossSalary) || 0;
+
+        const emyPF = Number(formData.emyPF) || 0;
+        const emyESIC = Number(formData.emyESIC) || 0;
+        const pTax = Number(formData.pTax) || 0;
+        const uniformCharges = Number(formData.uniformCharges) || 0;
+        const lwfEE = Number(formData.lwfEmployee) || 0;
+
+        const netAmount = Number(formData.netAmount) || 0;
+
+        const emrPF = Number(formData.emrPF) || 0;
+        const emrAdmin = Number(formData.emrAdminCharges) || 0;
+        const emrESIC = Number(formData.emrESIC) || 0;
+        const lwfER = Number(formData.lwfEmployer) || 0;
+        const gratuity = Number(formData.gratuity) || 0;
+        const totalEMR = Number(formData.totalEMRContribution) || 0;
+        const yearlyCtc = Number(formData.yearlyCTC) || 0;
+        const monthlyCTC = Number(formData.monthlyCTC) || 0;
+
+        const salaryData = [
+            // Section I
+            { sno: 'I', desc: 'Basic', monthly: basic, yearly: basic * 12, isBasicRow: true },
+            { sno: '', desc: 'HRA', monthly: hra, yearly: hra * 12 },
+            { sno: '', desc: 'Other Allowances', monthly: other, yearly: other * 12 },
+            { sno: '', desc: 'Monthly_Leave_Encashment', monthly: leaveEnc, yearly: leaveEnc * 12 },
+            { sno: '', desc: 'Advance_Bonus', monthly: advBonus, yearly: advBonus * 12 },
+            { sno: '', desc: 'Gross Salary on Pay Slip (A)', monthly: gross, yearly: gross * 12, highlight: true },
+            // Spacer
+            { sno: '', desc: '', monthly: '', yearly: '', isSpacer: true },
+            // Section II
+            { sno: 'II', desc: 'P.F.Deduction (Self Contribution)', monthly: emyPF, yearly: emyPF * 12, isSectionHeaderRow: true },
+            { sno: '', desc: 'ESI Deduction (Self Contribution)', monthly: emyESIC, yearly: emyESIC * 12 },
+            { sno: '', desc: 'Professional Tax', monthly: pTax, yearly: pTax * 12 },
+            { sno: '', desc: 'Labor Welfare Fund', monthly: lwfEE, yearly: lwfEE * 12 },
+            { sno: '', desc: 'Gross Deduction (B)', monthly: Number(formData.totalDeductions), yearly: Number(formData.totalDeductions) * 12, highlight: true },
+            { sno: '', desc: 'Employee Take Home Salary (C=A-B)', monthly: netAmount, yearly: netAmount * 12, blackRow: true },
+            // Spacer
+            { sno: '', desc: '', monthly: '', yearly: '', isSpacer: true },
+            // Section III
+            { sno: 'III', desc: "P.F.Deduction (Company's Contribution)", monthly: emrPF + emrAdmin, yearly: (emrPF + emrAdmin) * 12, isSectionHeaderRow: true },
+            { sno: '', desc: "ESI Deduction (Company's Contribution)", monthly: emrESIC, yearly: emrESIC * 12 },
+            { sno: '', desc: 'Gratuity *', monthly: gratuity, yearly: gratuity * 12 },
+            { sno: '', desc: 'Uniform Charges', monthly: uniformCharges, yearly: uniformCharges * 12 },
+            { sno: '', desc: 'Labor Welfare Fund', monthly: lwfER, yearly: lwfER * 12 },
+            { sno: '', desc: "Company's Additional Cost", monthly: totalEMR, yearly: totalEMR * 12, highlight: true },
+            { sno: '', desc: 'Total CTC of Company', monthly: monthlyCTC, yearly: yearlyCtc, blackRow: true }
+        ];
+
+        salaryData.forEach((row, rowIndex) => {
+            doc.save();
+
+            // Determine background colors for the 4 cells in this row
+            let bgColors = ['#ffffff', '#ffffff', '#ffffff', '#ffffff'];
+
+            if (row.isSpacer) {
+                bgColors = ['#fafafa', '#fafafa', '#fafafa', '#fafafa'];
+            } else if (row.blackRow) {
+                bgColors = ['#222222', '#222222', '#222222', '#222222'];
+            } else if (row.highlight) {
+                bgColors = ['#e2ebf0', '#e2ebf0', '#e2ebf0', '#e2ebf0'];
+            } else {
+                bgColors = ['#ffffff', '#ffffff', '#ffffff', '#ffffff'];
             }
+
+            // Draw background and cell border for each of the 4 cells
+            const currentRowHeight = row.isSpacer ? 6 : rowHeight;
+            for (let c = 0; c < 4; c++) {
+                doc.fillColor(bgColors[c]).rect(cellX[c], currentTableY, cellWidth[c], currentRowHeight).fill();
+                doc.strokeColor('#000000').lineWidth(0.5).rect(cellX[c], currentTableY, cellWidth[c], currentRowHeight).stroke();
+            }
+
+            // Draw text if it's not a spacer row
+            if (!row.isSpacer) {
+                // Determine font weight and text colors
+                let textColors = ['#000000', '#000000', '#000000', '#000000'];
+                let isBold = [false, false, false, false];
+
+                if (row.blackRow) {
+                    textColors = ['#ffffff', '#ffffff', '#ffffff', '#ffffff'];
+                    isBold = [true, true, true, true];
+                } else if (row.highlight) {
+                    textColors = ['#000000', '#000000', '#000000', '#000000'];
+                    isBold = [true, true, true, true];
+                } else if (row.isBasicRow || row.isSectionHeaderRow) {
+                    textColors = ['#000000', '#000000', '#000000', '#000000'];
+                    isBold = [true, true, false, true];
+                } else {
+                    textColors = ['#000000', '#000000', '#000000', '#000000'];
+                    isBold = [false, false, false, false];
+                }
+
+                const textY = currentTableY + 5.5;
+
+                // Draw S.No
+                if (row.sno) {
+                    doc.fillColor(textColors[0])
+                        .font(isBold[0] ? 'Helvetica-Bold' : 'Helvetica')
+                        .fontSize(8.5)
+                        .text(row.sno, cellX[0] + 8, textY);
+                }
+
+                // Draw Description
+                doc.fillColor(textColors[1])
+                    .font(isBold[1] ? 'Helvetica-Bold' : 'Helvetica')
+                    .fontSize(8.5)
+                    .text(row.desc, cellX[1] + 8, textY);
+
+                // Draw Per Month Value
+                const monthlyText = formatCellValPDF(row.monthly);
+                doc.fillColor(textColors[2])
+                    .font(isBold[2] ? 'Helvetica-Bold' : 'Helvetica')
+                    .fontSize(8.5)
+                    .text(monthlyText, cellX[2], textY, { width: cellWidth[2] - 8, align: 'right' });
+
+                // Draw Yearly Value
+                const yearlyText = formatCellValPDF(row.yearly);
+                doc.fillColor(textColors[3])
+                    .font(isBold[3] ? 'Helvetica-Bold' : 'Helvetica')
+                    .fontSize(8.5)
+                    .text(yearlyText, cellX[3], textY, { width: cellWidth[3] - 8, align: 'right' });
+            }
+
+            doc.restore();
+            currentTableY += currentRowHeight;
         });
 
-        doc.on('error', (err) => {
-            console.error('PDF Generation Error:', err);
-            import('fs').then(fs => fs.writeFileSync('backend-hrms-pdf-error.log', err.stack || err.message));
-            res.status(500).json({ success: false, message: 'PDF Kit Generation Error', error: err.message });
-        });
+        // Draw Gratuity Note at the bottom of the table
+        doc.save();
+        const totalWidth = col1Width + col2Width + col3Width + col4Width;
+        doc.fillColor('#ffffff').rect(cellX[0], currentTableY, totalWidth, rowHeight).fill();
+        doc.strokeColor('#000000').lineWidth(0.5).rect(cellX[0], currentTableY, totalWidth, rowHeight).stroke();
+        doc.fillColor('#000000').font('Helvetica-Bold').fontSize(8.5).text('* Gratuity - will be applicable after continuous 5 years of service as per the applicable laws.', cellX[0] + 8, currentTableY + 5.5);
+        doc.restore();
+
+        doc.end();
+    });
+};
+
+/**
+ * Generate Appointment Letter PDF
+ */
+export const generateAppointmentLetterPDF = async (req: Request, res: Response) => {
+    try {
+        const formData: AppointmentLetterData = req.body;
+        const showAnnexure = req.body.showAnnexure !== false; // Default to true if not provided
+
+        if (!formData.candidateName || !formData.designation || !formData.joiningDate) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields'
+            });
+        }
+
+        if (formData.employeeId) {
+            const [existingEmpLetter] = await pool.query<AppointmentLetterRecord[]>(
+                'SELECT id FROM hrms_appointment_letters WHERE employee_id = ?',
+                [formData.employeeId]
+            );
+            if (existingEmpLetter.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'An appointment letter has already been generated for this employee.'
+                });
+            }
+        }
+
+        const fileName = `Appointment_Letter_${formData.candidateName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+        const pdfData = await createAppointmentLetterPDFBuffer(formData, showAnnexure);
+        const blobName = await uploadBufferToBlob(pdfData, fileName, 'pdfs/', 'application/pdf');
+        const webPath = getBlobUrl(blobName);
+
+        // Write db record
+        const [result] = await pool.query<ResultSetHeader>(
+            `INSERT INTO hrms_appointment_letters 
+            (candidate_name, employee_id, designation, generated_date, joining_date, status, monthly_ctc, yearly_ctc, email, phone, appointment_data, pdf_path) 
+            VALUES (?, ?, ?, ?, ?, 'Draft', ?, ?, ?, ?, ?, ?)`,
+            [
+                formData.candidateName,
+                formData.employeeId,
+                formData.designation,
+                formData.date,
+                formData.joiningDate,
+                formData.monthlyCTC,
+                formData.yearlyCTC,
+                formData.email || null,
+                formData.phone || null,
+                JSON.stringify(formData),
+                webPath
+            ]
+        );
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.setHeader('Content-Length', pdfData.length);
+        res.setHeader('X-Offer-Letter-Id', result.insertId.toString());
+        res.setHeader('Access-Control-Expose-Headers', 'X-Offer-Letter-Id');
+        res.send(pdfData);
 
     } catch (error: any) {
         console.error('Error in generateAppointmentLetterPDF:', error);
         import('fs').then(fs => fs.writeFileSync('backend-hrms-error.log', error.stack || error.message));
         res.status(500).json({ success: false, message: 'Internal Server Error', error: error.message, stack: error.stack });
+    }
+};
+
+/**
+ * Update Appointment Letter
+ */
+export const updateAppointmentLetter = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const formData: AppointmentLetterData = req.body;
+        const showAnnexure = req.body.showAnnexure !== false;
+
+        if (!formData.candidateName || !formData.designation || !formData.joiningDate) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields'
+            });
+        }
+
+        const [existing] = await pool.query<AppointmentLetterRecord[]>(
+            'SELECT * FROM hrms_appointment_letters WHERE id = ?',
+            [id]
+        );
+
+        if (existing.length === 0) {
+            return res.status(404).json({ success: false, message: 'Appointment letter not found' });
+        }
+
+        if (existing[0].status === 'Accepted') {
+            return res.status(400).json({ success: false, message: 'Cannot edit an already accepted appointment letter' });
+        }
+
+        if (formData.employeeId) {
+            const [existingEmpLetter] = await pool.query<AppointmentLetterRecord[]>(
+                'SELECT id FROM hrms_appointment_letters WHERE employee_id = ? AND id != ?',
+                [formData.employeeId, id]
+            );
+            if (existingEmpLetter.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'An appointment letter has already been generated for this employee.'
+                });
+            }
+        }
+
+        const fileName = `Appointment_Letter_${formData.candidateName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+        const pdfData = await createAppointmentLetterPDFBuffer(formData, showAnnexure);
+        const blobName = await uploadBufferToBlob(pdfData, fileName, 'pdfs/', 'application/pdf');
+        const webPath = getBlobUrl(blobName);
+
+        await pool.query(
+            `UPDATE hrms_appointment_letters 
+             SET candidate_name = ?, employee_id = ?, designation = ?, generated_date = ?, joining_date = ?, monthly_ctc = ?, yearly_ctc = ?, email = ?, phone = ?, appointment_data = ?, pdf_path = ?
+             WHERE id = ?`,
+            [
+                formData.candidateName,
+                formData.employeeId || null,
+                formData.designation,
+                formData.date,
+                formData.joiningDate,
+                formData.monthlyCTC,
+                formData.yearlyCTC,
+                formData.email || null,
+                formData.phone || null,
+                JSON.stringify(formData),
+                webPath,
+                id
+            ]
+        );
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.setHeader('Content-Length', pdfData.length);
+        res.setHeader('X-Offer-Letter-Id', id.toString());
+        res.setHeader('Access-Control-Expose-Headers', 'X-Offer-Letter-Id');
+        res.send(pdfData);
+
+    } catch (error: any) {
+        console.error('Error in updateAppointmentLetter:', error);
+        res.status(500).json({ success: false, message: 'Internal Server Error', error: error.message });
     }
 };
 
@@ -586,6 +671,17 @@ export const updateAppointmentLetterStatus = async (req: Request, res: Response)
         const { status, employeeId } = req.body;
 
         if (employeeId) {
+            const [existingEmpLetter] = await pool.query<AppointmentLetterRecord[]>(
+                'SELECT id FROM hrms_appointment_letters WHERE employee_id = ? AND id != ?',
+                [employeeId, id]
+            );
+            if (existingEmpLetter.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'This employee already has an appointment letter assigned.'
+                });
+            }
+
             await pool.query(
                 'UPDATE hrms_appointment_letters SET status = ?, employee_id = ? WHERE id = ?',
                 [status, employeeId, id]
@@ -608,6 +704,19 @@ export const updateAppointmentLetterStatus = async (req: Request, res: Response)
 export const deleteAppointmentLetter = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
+        const [existing] = await pool.query<AppointmentLetterRecord[]>(
+            'SELECT * FROM hrms_appointment_letters WHERE id = ?',
+            [id]
+        );
+
+        if (existing.length === 0) {
+            return res.status(404).json({ success: false, message: 'Appointment letter not found' });
+        }
+
+        if (existing[0].status === 'Accepted') {
+            return res.status(400).json({ success: false, message: 'Cannot delete an already accepted appointment letter' });
+        }
+
         await pool.query('DELETE FROM hrms_appointment_letters WHERE id = ?', [id]);
         res.status(200).json({ success: true, message: 'Appointment letter deleted successfully' });
     } catch (error: any) {
