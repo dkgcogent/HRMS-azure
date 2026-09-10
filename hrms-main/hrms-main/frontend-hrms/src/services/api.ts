@@ -1434,6 +1434,79 @@ class ApiService {
     return response.data;
   }
 
+  // Payment Sheet APIs
+  async getPaymentSheets(): Promise<ApiResponse<any[]>> {
+    try {
+      const response = await api.get('/api/payroll/payment-sheets');
+      return response.data;
+    } catch (error: any) {
+      return handleApiError(error, 'fetch payment sheets', []);
+    }
+  }
+
+  async getPaymentSheetById(id: number): Promise<ApiResponse<any>> {
+    try {
+      const response = await api.get(`/api/payroll/payment-sheets/${id}`);
+      return response.data;
+    } catch (error: any) {
+      return handleApiError(error, 'fetch payment sheet details', null);
+    }
+  }
+
+  async savePaymentSheet(data: any): Promise<ApiResponse<any>> {
+    try {
+      const response = await api.post('/api/payroll/payment-sheets', data);
+      return response.data;
+    } catch (error: any) {
+      return handleApiError(error, 'save payment sheet', null);
+    }
+  }
+
+  async updatePaymentSheet(id: number, data: any): Promise<ApiResponse<any>> {
+    try {
+      const response = await api.put(`/api/payroll/payment-sheets/${id}`, data);
+      return response.data;
+    } catch (error: any) {
+      return handleApiError(error, 'update payment sheet', null);
+    }
+  }
+
+  async sendPaymentSheetForApproval(id: number): Promise<ApiResponse<any>> {
+    try {
+      const response = await api.post(`/api/payroll/payment-sheets/${id}/send-approval`);
+      return response.data;
+    } catch (error: any) {
+      return handleApiError(error, 'send payment sheet for approval', null);
+    }
+  }
+
+  async approvePaymentSheet(id: number): Promise<ApiResponse<any>> {
+    try {
+      const response = await api.post(`/api/payroll/payment-sheets/${id}/approve`);
+      return response.data;
+    } catch (error: any) {
+      return handleApiError(error, 'approve payment sheet', null);
+    }
+  }
+
+  async rejectPaymentSheet(id: number, reason?: string): Promise<ApiResponse<any>> {
+    try {
+      const response = await api.post(`/api/payroll/payment-sheets/${id}/reject`, { reason });
+      return response.data;
+    } catch (error: any) {
+      return handleApiError(error, 'reject payment sheet', null);
+    }
+  }
+
+  async deletePaymentSheet(id: number): Promise<ApiResponse<any>> {
+    try {
+      const response = await api.delete(`/api/payroll/payment-sheets/${id}`);
+      return response.data;
+    } catch (error: any) {
+      return handleApiError(error, 'delete payment sheet', null);
+    }
+  }
+
   // Dashboard APIs
   async getDashboardStats() {
     const response = await api.get('/api/dashboard/stats');

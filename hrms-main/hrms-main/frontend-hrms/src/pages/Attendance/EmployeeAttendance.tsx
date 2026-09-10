@@ -22,7 +22,7 @@ import {
   GridProps,
   Button,
 } from '@mui/material';
-import { Search as SearchIcon, Schedule as ScheduleIcon, Upload as UploadIcon, Download as DownloadIcon } from '@mui/icons-material';
+import { Search as SearchIcon, Schedule as ScheduleIcon, Upload as UploadIcon, Download as DownloadIcon, DateRange as DateRangeIcon, FilterList as FilterListIcon, RestartAlt as ResetIcon, Clear as ClearIcon, Description as TemplateIcon } from '@mui/icons-material';
 import Papa from 'papaparse';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
@@ -46,6 +46,10 @@ const EmployeeAttendance: React.FC = () => {
   const [filteredAttendance, setFilteredAttendance] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [activePreset, setActivePreset] = useState('ALL');
   const [loading, setLoading] = useState(false);
 
   const loadData = async () => {
@@ -100,26 +104,97 @@ const EmployeeAttendance: React.FC = () => {
     }
   };
 
+  // Quick Date Presets Handler
+  const handleSetPreset = (preset: string) => {
+    setActivePreset(preset);
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const toYMD = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+    if (preset === 'TODAY') {
+      const todayStr = toYMD(now);
+      setFromDate(todayStr);
+      setToDate(todayStr);
+    } else if (preset === 'YESTERDAY') {
+      const y = new Date(now);
+      y.setDate(y.getDate() - 1);
+      const yStr = toYMD(y);
+      setFromDate(yStr);
+      setToDate(yStr);
+    } else if (preset === 'THIS_WEEK') {
+      const temp = new Date(now);
+      const day = temp.getDay();
+      const diff = temp.getDate() - day + (day === 0 ? -6 : 1); // Monday
+      const monday = new Date(temp.setDate(diff));
+      setFromDate(toYMD(monday));
+      setToDate(toYMD(new Date()));
+    } else if (preset === 'THIS_MONTH') {
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      setFromDate(toYMD(firstDay));
+      setToDate(toYMD(lastDay));
+    } else if (preset === 'LAST_MONTH') {
+      const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
+      setFromDate(toYMD(firstDay));
+      setToDate(toYMD(lastDay));
+    } else if (preset === 'ALL') {
+      setFromDate('');
+      setToDate('');
+    }
+  };
+
+  // Reset all filters
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setSelectedEmployee('');
+    setStatusFilter('ALL');
+    setFromDate('');
+    setToDate('');
+    setActivePreset('ALL');
+  };
+
   useEffect(() => {
     let filtered = attendance;
 
     // Filter by employee
     if (selectedEmployee) {
-      filtered = filtered.filter((rec) => rec.employee_id === Number(selectedEmployee));
+      filtered = filtered.filter((rec) => String(rec.employee_id) === String(selectedEmployee));
     }
 
-    // Filter by search term (employee name)
+    // Filter by search term (employee name or ID or code)
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(
         (rec) =>
           `${rec.first_name || ''} ${rec.last_name || ''}`.toLowerCase().includes(searchLower) ||
-          rec.employee_id?.toString().includes(searchTerm)
+          rec.employee_id?.toString().includes(searchTerm) ||
+          (rec.employee_code && String(rec.employee_code).toLowerCase().includes(searchLower))
       );
     }
 
+    // Filter by Status
+    if (statusFilter && statusFilter !== 'ALL') {
+      filtered = filtered.filter((rec) => rec.status === statusFilter);
+    }
+
+    // Filter by Date Range (From Date & To Date)
+    if (fromDate) {
+      filtered = filtered.filter((rec) => {
+        const d = formatDate(rec.date);
+        return d >= fromDate;
+      });
+    }
+
+    if (toDate) {
+      filtered = filtered.filter((rec) => {
+        const d = formatDate(rec.date);
+        return d <= toDate;
+      });
+    }
+
     setFilteredAttendance(filtered);
-  }, [searchTerm, selectedEmployee, attendance]);
+  }, [searchTerm, selectedEmployee, fromDate, toDate, statusFilter, attendance]);
 
   const handleExportData = () => {
     if (!filteredAttendance.length) return;
@@ -141,6 +216,40 @@ const EmployeeAttendance: React.FC = () => {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance");
     XLSX.writeFile(workbook, `Attendance_Records_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  // Download Empty Format Template for Attendance Import
+  const handleDownloadTemplate = () => {
+    const headers = [
+      [
+        'Employee ID',
+        'Employee Name',
+        'Date',
+        'Check-In',
+        'Check-Out',
+        'Attendance Status',
+        'Work Location',
+        'Remarks'
+      ]
+    ];
+
+    const worksheet = XLSX.utils.aoa_to_sheet(headers);
+
+    // Auto column widths
+    worksheet['!cols'] = [
+      { wch: 15 }, // Employee ID
+      { wch: 25 }, // Employee Name
+      { wch: 15 }, // Date
+      { wch: 15 }, // Check-In
+      { wch: 15 }, // Check-Out
+      { wch: 20 }, // Attendance Status
+      { wch: 18 }, // Work Location
+      { wch: 25 }, // Remarks
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance_Template");
+    XLSX.writeFile(workbook, `Attendance_Import_Template.xlsx`);
   };
 
   const handleImportData = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -376,26 +485,85 @@ const EmployeeAttendance: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Filters */}
-      <Paper sx={{ p: 2, mb: 3 }}>
+      {/* Filters Card */}
+      <Paper sx={{ p: 2.5, mb: 3, borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <FilterListIcon color="primary" fontSize="small" />
+            <Typography variant="subtitle1" fontWeight="bold">
+              Filter Records
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            <Button
+              size="small"
+              variant={activePreset === 'ALL' && !fromDate && !toDate ? 'contained' : 'outlined'}
+              onClick={() => handleSetPreset('ALL')}
+              sx={{ textTransform: 'none', borderRadius: 1.5, px: 1.5 }}
+            >
+              All Time
+            </Button>
+            <Button
+              size="small"
+              variant={activePreset === 'TODAY' ? 'contained' : 'outlined'}
+              onClick={() => handleSetPreset('TODAY')}
+              sx={{ textTransform: 'none', borderRadius: 1.5, px: 1.5 }}
+            >
+              Today
+            </Button>
+            <Button
+              size="small"
+              variant={activePreset === 'THIS_MONTH' ? 'contained' : 'outlined'}
+              onClick={() => handleSetPreset('THIS_MONTH')}
+              sx={{ textTransform: 'none', borderRadius: 1.5, px: 1.5 }}
+            >
+              This Month
+            </Button>
+            <Button
+              size="small"
+              variant={activePreset === 'LAST_MONTH' ? 'contained' : 'outlined'}
+              onClick={() => handleSetPreset('LAST_MONTH')}
+              sx={{ textTransform: 'none', borderRadius: 1.5, px: 1.5 }}
+            >
+              Last Month
+            </Button>
+            {(searchTerm || selectedEmployee || statusFilter !== 'ALL' || fromDate || toDate) && (
+              <Button
+                size="small"
+                color="error"
+                variant="outlined"
+                startIcon={<ResetIcon />}
+                onClick={handleResetFilters}
+                sx={{ textTransform: 'none', borderRadius: 1.5, ml: 0.5 }}
+              >
+                Reset
+              </Button>
+            )}
+          </Box>
+        </Box>
+
         <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={6}>
+          {/* Search by Name / ID */}
+          <Grid item xs={12} sm={6} md={4}>
             <TextField
               fullWidth
+              size="small"
               placeholder="Search by employee name or ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon />
+                    <SearchIcon fontSize="small" color="action" />
                   </InputAdornment>
                 ),
               }}
             />
           </Grid>
-          <Grid item xs={12} md={6}>
-            <FormControl fullWidth>
+
+          {/* Filter by Employee (Commented Out)
+          <Grid item xs={12} sm={6} md={2.5}>
+            <FormControl fullWidth size="small">
               <InputLabel>Filter by Employee</InputLabel>
               <Select
                 value={selectedEmployee}
@@ -411,6 +579,72 @@ const EmployeeAttendance: React.FC = () => {
               </Select>
             </FormControl>
           </Grid>
+          */}
+
+          {/* Attendance Status */}
+          <Grid item xs={12} sm={6} md={2.6}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Status</InputLabel>
+              <Select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                label="Status"
+              >
+                <MenuItem value="ALL">All Statuses</MenuItem>
+                <MenuItem value="PRESENT">Present</MenuItem>
+                <MenuItem value="ABSENT">Absent</MenuItem>
+                <MenuItem value="LATE">Late</MenuItem>
+                <MenuItem value="HALF_DAY">Half Day</MenuItem>
+                <MenuItem value="WORK_FROM_HOME">WFH</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
+          {/* From Date */}
+          <Grid item xs={12} sm={6} md={2.7}>
+            <TextField
+              fullWidth
+              size="small"
+              type="date"
+              label="From Date"
+              value={fromDate}
+              onChange={(e) => {
+                setFromDate(e.target.value);
+                setActivePreset('CUSTOM');
+              }}
+              InputLabelProps={{ shrink: true }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <DateRangeIcon fontSize="small" color="action" />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Grid>
+
+          {/* To Date */}
+          <Grid item xs={12} sm={6} md={2.7}>
+            <TextField
+              fullWidth
+              size="small"
+              type="date"
+              label="To Date"
+              value={toDate}
+              onChange={(e) => {
+                setToDate(e.target.value);
+                setActivePreset('CUSTOM');
+              }}
+              InputLabelProps={{ shrink: true }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <DateRangeIcon fontSize="small" color="action" />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Grid>
         </Grid>
       </Paper>
 
@@ -421,7 +655,17 @@ const EmployeeAttendance: React.FC = () => {
             <ScheduleIcon />
             <Typography variant="h6">Attendance Records</Typography>
           </Box>
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Button
+              variant="outlined"
+              color="primary"
+              startIcon={<TemplateIcon />}
+              onClick={handleDownloadTemplate}
+              disabled={loading}
+              sx={{ textTransform: 'none', fontWeight: 500 }}
+            >
+              Download Template
+            </Button>
             <input
               type="file"
               accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
@@ -430,11 +674,11 @@ const EmployeeAttendance: React.FC = () => {
               onChange={handleImportData}
             />
             <label htmlFor="import-csv-input">
-              <Button component="span" variant="outlined" startIcon={<UploadIcon />} disabled={loading}>
+              <Button component="span" variant="outlined" startIcon={<UploadIcon />} disabled={loading} sx={{ textTransform: 'none' }}>
                 Import
               </Button>
             </label>
-            <Button variant="contained" startIcon={<DownloadIcon />} onClick={handleExportData} disabled={loading || !filteredAttendance.length}>
+            <Button variant="contained" startIcon={<DownloadIcon />} onClick={handleExportData} disabled={loading || !filteredAttendance.length} sx={{ textTransform: 'none' }}>
               Export
             </Button>
           </Box>

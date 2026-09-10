@@ -31,6 +31,7 @@ import LeaveApprovalForm from './pages/Leave/LeaveApprovalForm';
 import LeaveBalanceForm from './pages/Leave/LeaveBalanceForm';
 import PayrollForm from './pages/Payroll/PayrollForm';
 import PayslipList from './pages/Payroll/PayslipList';
+import PaymentSheet from './pages/Payroll/PaymentSheet';
 import PerformanceForm from './pages/Performance/PerformanceForm';
 import AppraisalManagementForm from './pages/Performance/AppraisalManagementForm';
 
@@ -155,6 +156,8 @@ function App() {
               <Route path="/payroll" element={<PayrollForm />} />
               <Route path="/payroll/new" element={<PayrollForm />} />
               <Route path="/payroll/edit/:id" element={<PayrollForm />} />
+              <Route path="/payroll/payment-sheet" element={<PaymentSheet />} />
+              <Route path="/payment-sheet" element={<PaymentSheet />} />
               <Route path="/payslips" element={<PayslipList />} />
               <Route path="/payslips/create" element={<PayrollForm />} />
               <Route path="/payslips/edit/:id" element={<PayrollForm />} />

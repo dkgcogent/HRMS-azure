@@ -95,9 +95,9 @@ const Sidebar: React.FC<SidebarProps> = ({ open = true, onToggle }) => {
     { text: 'Benefits', icon: <BenefitsIcon />, path: '/benefits/insurance', roles: ['admin'], underDevelopment: true },
     { text: 'Notifications', icon: <NotificationIcon />, path: '/communication/notifications', roles: ['admin'], underDevelopment: true },
     // { text: 'Offer Letter', icon: <DocumentIcon />, path: '/documents/offer-letter', roles: ['admin'] },
-    { text: 'Letter', icon: <DocumentIcon />, path: '/documents/letters', roles: ['admin', 'hr'] },
     { text: 'Appointment Letter', icon: <DocumentIcon />, path: '/documents/appointment-letter', roles: ['admin', 'hr'] },
     { text: 'Payroll', icon: <PaymentIcon />, path: '/payroll', roles: ['admin'] },
+    { text: 'Payment Sheet', icon: <PaymentIcon />, path: '/payroll/payment-sheet', roles: ['admin', 'hr'] },
     // { text: 'Appointment Letter', icon: <DocumentIcon />, path: '/documents/my-offer-letter', roles: ['employee'] },
     { text: 'My Attendance', icon: <ScheduleIcon />, path: '/attendance', roles: ['employee', 'hr'] },
 

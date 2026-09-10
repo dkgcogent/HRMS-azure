@@ -48,6 +48,7 @@ import {
   Close as CloseIcon,
   CalendarMonth as CalendarMonthIcon,
   People as PeopleIcon,
+  TableChart as TableChartIcon,
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiService, API_BASE_URL } from '../../services/api';
@@ -229,6 +230,59 @@ const PayrollForm: React.FC = () => {
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<number[]>([]);
   const [payslipSelectionDate, setPayslipSelectionDate] = useState<string>(() => fromDate ? fromDate.substring(0, 7) : firstDayStr.substring(0, 7));
   const [empSearchQuery, setEmpSearchQuery] = useState<string>('');
+
+  // Payment Sheet Save State
+  const [savingPaymentSheet, setSavingPaymentSheet] = useState(false);
+  const [paymentSheetSaved, setPaymentSheetSaved] = useState(false);
+
+  const handleSavePaymentSheet = async () => {
+    if (batchRecords.length === 0) {
+      setSnackbar({ open: true, message: 'No payroll records available to save as payment sheet.', severity: 'warning' });
+      return;
+    }
+
+    try {
+      setSavingPaymentSheet(true);
+      const fromDateObj = new Date(fromDate);
+      const selectedMonth = fromDateObj.getMonth() + 1;
+      const selectedYear = fromDateObj.getFullYear();
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthStr = `${monthNames[selectedMonth - 1]}-${String(selectedYear).slice(-2)}`;
+
+      const validRecords = batchRecords.filter(r => r.payrollStatus !== 'FAILED');
+      const res = await apiService.savePaymentSheet({
+        month_str: monthStr,
+        start_date: fromDate,
+        end_date: toDate,
+        status: 'DRAFT',
+        sheet_data: validRecords
+      });
+
+      if (res.success) {
+        setPaymentSheetSaved(true);
+        setSnackbar({
+          open: true,
+          message: `Payment sheet for ${monthStr} (${validRecords.length} employees) saved to database successfully!`,
+          severity: 'success'
+        });
+      } else {
+        setSnackbar({
+          open: true,
+          message: res.message || 'Failed to save payment sheet',
+          severity: 'error'
+        });
+      }
+    } catch (error: any) {
+      console.error('Error saving payment sheet:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error saving payment sheet to database.',
+        severity: 'error'
+      });
+    } finally {
+      setSavingPaymentSheet(false);
+    }
+  };
 
   useEffect(() => {
     sessionStorage.setItem('bulkPayroll_fromDate', fromDate);
@@ -1179,6 +1233,7 @@ const PayrollForm: React.FC = () => {
       setBatchRecords(records);
       setProgressPercent(100);
       setProgressText('Payroll generation completed!');
+      setPaymentSheetSaved(false);
 
       setSummaryStats({
         totalEmployees: activeEmps.length,
@@ -1491,14 +1546,25 @@ const PayrollForm: React.FC = () => {
             Generate bulk payroll and payslips for all active employees for the selected Date Range.
           </Typography>
         </Box>
-        <Button
-          variant="outlined"
-          color="secondary"
-          onClick={() => navigate('/payslips')}
-          sx={{ fontWeight: 'bold' }}
-        >
-          View Payslip History
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<TableChartIcon />}
+            onClick={() => navigate('/payroll/payment-sheet')}
+            sx={{ fontWeight: 'bold' }}
+          >
+            View Payment Sheet
+          </Button>
+          <Button
+            variant="outlined"
+            color="secondary"
+            onClick={() => navigate('/payslips')}
+            sx={{ fontWeight: 'bold' }}
+          >
+            View Payslip History
+          </Button>
+        </Box>
       </Box>
 
       {/* Date Range Selection Controls */}
@@ -1610,6 +1676,22 @@ const PayrollForm: React.FC = () => {
                     }}
                   >
                     View Payslip History
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="large"
+                    startIcon={<TableChartIcon />}
+                    onClick={() => navigate('/payroll/payment-sheet')}
+                    sx={{
+                      ml: 2,
+                      px: 3,
+                      py: 1.2,
+                      fontWeight: 'bold',
+                      fontSize: '1rem',
+                    }}
+                  >
+                    View Payment Sheet
                   </Button>
                 </>
               )}
@@ -1730,25 +1812,50 @@ const PayrollForm: React.FC = () => {
                 </Button>
               </Box>
             </Box>
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<DownloadIcon />}
-              onClick={handleExportExcel}
-              disabled={batchRecords.length === 0}
-              sx={{
-                borderRadius: 2,
-                px: 3,
-                fontWeight: 'bold',
-                background: 'linear-gradient(135deg, #107c41 0%, #1f8a4c 100%)',
-                boxShadow: '0 4px 12px rgba(16, 124, 65, 0.3)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #0b5c30 0%, #15733e 100%)',
-                }
-              }}
-            >
-              Export to Excel (34 Columns)
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+              <Button
+                variant="contained"
+                startIcon={savingPaymentSheet ? <CircularProgress size={18} color="inherit" /> : paymentSheetSaved ? <CheckCircleIcon /> : <SaveIcon />}
+                onClick={handleSavePaymentSheet}
+                disabled={batchRecords.length === 0 || savingPaymentSheet}
+                sx={{
+                  borderRadius: 2,
+                  px: 3,
+                  fontWeight: 'bold',
+                  background: paymentSheetSaved
+                    ? 'linear-gradient(135deg, #2e7d32 0%, #388e3c 100%)'
+                    : 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+                  boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)',
+                  '&:hover': {
+                    background: paymentSheetSaved
+                      ? 'linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%)'
+                      : 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)',
+                  }
+                }}
+              >
+                {savingPaymentSheet ? 'Saving...' : paymentSheetSaved ? 'Payment Sheet Saved' : 'Save Payment Sheet'}
+              </Button>
+
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<DownloadIcon />}
+                onClick={handleExportExcel}
+                disabled={batchRecords.length === 0}
+                sx={{
+                  borderRadius: 2,
+                  px: 3,
+                  fontWeight: 'bold',
+                  background: 'linear-gradient(135deg, #107c41 0%, #1f8a4c 100%)',
+                  boxShadow: '0 4px 12px rgba(16, 124, 65, 0.3)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #0b5c30 0%, #15733e 100%)',
+                  }
+                }}
+              >
+                Export to Excel (34 Columns)
+              </Button>
+            </Box>
           </Box>
 
           <TableContainer sx={{ maxHeight: 600, border: '1px solid #e0e0e0', borderRadius: 1.5 }}>
