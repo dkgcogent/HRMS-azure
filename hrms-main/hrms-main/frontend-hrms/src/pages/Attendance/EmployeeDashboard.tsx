@@ -45,9 +45,24 @@ const EmployeeDashboard: React.FC = () => {
   const [regularizations, setRegularizations] = useState<any[]>([]);
   const [dialogs, setDialogs] = useState({ mark: false, manual: false, regularize: false });
 
+  const getTodayIST = () => {
+    // Returns YYYY-MM-DD in IST
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  };
+
+  const getCurrentTimeIST = () => {
+    // Returns HH:mm in IST
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).format(new Date());
+  };
+
   const [manualForm, setManualForm] = useState({
-    date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()),
-    check_in_time: '',
+    date: getTodayIST(),
+    check_in_time: getCurrentTimeIST(),
     check_out_time: '',
     reason: '',
   });
@@ -92,11 +107,6 @@ const EmployeeDashboard: React.FC = () => {
     }
   };
 
-  const getTodayIST = () => {
-    // Returns YYYY-MM-DD in IST
-    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-  };
-
   const latestStatus = useMemo(() => {
     if (!records.length) return null;
     const today = getTodayIST();
@@ -118,21 +128,20 @@ const EmployeeDashboard: React.FC = () => {
     return records.find(r => formatDate(r.date) === manualForm.date);
   }, [manualForm.date, records]);
 
-  // Sync manual form with existing record
+  // Sync manual form with existing record or current system time
   useEffect(() => {
     if (manualRecord) {
       setManualForm(prev => ({
         ...prev,
-        check_in_time: manualRecord.check_in_time || '',
-        check_out_time: manualRecord.check_out_time || prev.check_out_time,
+        date: formatDate(manualRecord.date) || getTodayIST(),
+        check_in_time: manualRecord.check_in_time ? String(manualRecord.check_in_time).slice(0, 5) : getCurrentTimeIST(),
+        check_out_time: manualRecord.check_out_time ? String(manualRecord.check_out_time).slice(0, 5) : prev.check_out_time,
       }));
     } else {
-      // If user changes to a date with no record, we might want to clear pre-filled times
-      // but only if they were pre-filled (not if user typed them).
-      // For simplicity, we'll clear them to provide a fresh state for the new date.
       setManualForm(prev => ({
         ...prev,
-        check_in_time: '',
+        date: getTodayIST(),
+        check_in_time: getCurrentTimeIST(),
         check_out_time: '',
       }));
     }
@@ -446,10 +455,10 @@ const EmployeeDashboard: React.FC = () => {
                       type="date"
                       fullWidth
                       value={manualForm.date}
-                      onChange={(e) => setManualForm({ ...manualForm, date: e.target.value })}
                       InputLabelProps={{ shrink: true }}
+                      InputProps={{ readOnly: true }}
+                      disabled
                       required
-                      disabled={!!manualRecord && !!manualRecord.check_in_time && !manualRecord.check_out_time}
                     />
                   </Grid>
                   <Grid item xs={12} md={3}>
@@ -458,9 +467,9 @@ const EmployeeDashboard: React.FC = () => {
                       type="time"
                       fullWidth
                       value={manualForm.check_in_time}
-                      onChange={(e) => setManualForm({ ...manualForm, check_in_time: e.target.value })}
                       InputLabelProps={{ shrink: true }}
-                      disabled={!!manualRecord && !!manualRecord.check_in_time}
+                      InputProps={{ readOnly: true }}
+                      disabled
                     />
                   </Grid>
                   <Grid item xs={12} md={3}>

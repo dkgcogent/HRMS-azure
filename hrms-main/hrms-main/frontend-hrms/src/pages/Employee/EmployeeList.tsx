@@ -20,6 +20,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Tooltip,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -28,6 +29,8 @@ import {
   Delete as DeleteIcon,
   FilterList as FilterIcon,
   Download as DownloadIcon,
+  Visibility as VisibilityIcon,
+  VisibilityOff as VisibilityOffIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { Employee, apiService, Department } from '../../services/api';
@@ -42,6 +45,14 @@ const EmployeeList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
+  const [showPasswords, setShowPasswords] = useState<{ [key: number]: boolean }>({});
+
+  const togglePasswordVisibility = (id: number) => {
+    setShowPasswords((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
 
   const loadEmployees = useCallback(async () => {
     try {
@@ -342,8 +353,27 @@ const EmployeeList: React.FC = () => {
                   </TableCell>
                   <TableCell><Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{employee.employeeId}</Typography></TableCell>
                   <TableCell>
-                    <Typography variant="caption" sx={{ fontFamily: 'monospace', display: 'block' }}>User: {employee.employeeId}</Typography>
-                    <Typography variant="caption" sx={{ fontFamily: 'monospace', display: 'block' }}>Pass: password123</Typography>
+                    <Typography variant="caption" sx={{ fontFamily: 'monospace', display: 'block' }}>
+                      User: {employee.employeeId}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                        Pass: {showPasswords[employee.id!] ? 'password123' : '••••••••'}
+                      </Typography>
+                      <Tooltip title={showPasswords[employee.id!] ? 'Hide password' : 'Show password'}>
+                        <IconButton
+                          size="small"
+                          onClick={() => togglePasswordVisibility(employee.id!)}
+                          sx={{ p: '2px', color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
+                        >
+                          {showPasswords[employee.id!] ? (
+                            <VisibilityOffIcon sx={{ fontSize: 16 }} />
+                          ) : (
+                            <VisibilityIcon sx={{ fontSize: 16 }} />
+                          )}
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
                   </TableCell>
                   <TableCell><Typography variant="body2">{employee.mobile}</Typography></TableCell>
                   <TableCell><Typography variant="body2">{employee.departmentName}</Typography></TableCell>

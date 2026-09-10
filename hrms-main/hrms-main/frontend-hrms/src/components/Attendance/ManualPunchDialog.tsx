@@ -10,9 +10,22 @@ type Props = {
 };
 
 const ManualPunchDialog: React.FC<Props> = ({ open, onClose, onSubmit, records = [] }) => {
+  const getTodayIST = () => {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  };
+
+  const getCurrentTimeIST = () => {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).format(new Date());
+  };
+
   const [form, setForm] = React.useState({ 
-    date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()), 
-    check_in_time: '', 
+    date: getTodayIST(), 
+    check_in_time: getCurrentTimeIST(), 
     check_out_time: '', 
     reason: '' 
   });
@@ -37,18 +50,26 @@ const ManualPunchDialog: React.FC<Props> = ({ open, onClose, onSubmit, records =
     return records.find(r => formatDate(r.date) === form.date);
   }, [form.date, records]);
 
-  // Sync form with existing record
+  // Sync form with existing record or current system time
   useEffect(() => {
-    if (existingRecord) {
-      setForm(prev => ({
-        ...prev,
-        check_in_time: existingRecord.check_in_time || '',
-        check_out_time: existingRecord.check_out_time || prev.check_out_time,
-      }));
-    } else {
-      setForm(prev => ({ ...prev, check_in_time: '', check_out_time: '' }));
+    if (open) {
+      if (existingRecord) {
+        setForm(prev => ({
+          ...prev,
+          date: formatDate(existingRecord.date) || getTodayIST(),
+          check_in_time: existingRecord.check_in_time ? String(existingRecord.check_in_time).slice(0, 5) : getCurrentTimeIST(),
+          check_out_time: existingRecord.check_out_time ? String(existingRecord.check_out_time).slice(0, 5) : prev.check_out_time,
+        }));
+      } else {
+        setForm({
+          date: getTodayIST(),
+          check_in_time: getCurrentTimeIST(),
+          check_out_time: '',
+          reason: ''
+        });
+      }
     }
-  }, [existingRecord]);
+  }, [open, existingRecord]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,8 +77,8 @@ const ManualPunchDialog: React.FC<Props> = ({ open, onClose, onSubmit, records =
     try {
       await onSubmit(form);
       setForm({ 
-        date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()), 
-        check_in_time: '', 
+        date: getTodayIST(), 
+        check_in_time: getCurrentTimeIST(), 
         check_out_time: '', 
         reason: '' 
       });
@@ -77,21 +98,21 @@ const ManualPunchDialog: React.FC<Props> = ({ open, onClose, onSubmit, records =
               label="Date" 
               type="date" 
               value={form.date} 
-              onChange={(e) => setForm({ ...form, date: e.target.value })} 
               fullWidth 
               InputLabelProps={{ shrink: true }} 
+              InputProps={{ readOnly: true }}
+              disabled 
               required 
-              disabled={!!existingRecord && !!existingRecord.check_in_time && !existingRecord.check_out_time}
             />
             <Stack direction="row" spacing={2}>
               <TextField 
                 label="In" 
                 type="time" 
                 value={form.check_in_time} 
-                onChange={(e) => setForm({ ...form, check_in_time: e.target.value })} 
                 fullWidth 
                 InputLabelProps={{ shrink: true }} 
-                disabled={!!existingRecord && !!existingRecord.check_in_time}
+                InputProps={{ readOnly: true }}
+                disabled
               />
               <TextField 
                 label="Out" 

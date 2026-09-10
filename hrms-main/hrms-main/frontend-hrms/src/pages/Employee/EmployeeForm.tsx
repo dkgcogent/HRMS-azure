@@ -54,7 +54,10 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 const Grid = (props: GridProps & {
   item?: boolean;
   xs?: number | boolean;
+  sm?: number | boolean;
   md?: number | boolean;
+  lg?: number | boolean;
+  xl?: number | boolean;
 }) => {
   if (props.item) {
     return <MuiGrid component="div" {...props} />;
@@ -348,7 +351,7 @@ const EmployeeForm: React.FC = () => {
   const handleIfscChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value.toUpperCase();
     setEmployee(prev => ({ ...prev, ifscCode: value }));
-    
+
     if (value.length === 11) {
       try {
         const response = await fetch(`https://ifsc.razorpay.com/${value}`);
@@ -356,9 +359,9 @@ const EmployeeForm: React.FC = () => {
           const data = await response.json();
           setEmployee(prev => {
             let matchedBankId = prev.bankId;
-            const matchingBank = banks.find(b => 
-              (b.name && data.BANK) && (b.name.toLowerCase().includes(data.BANK.toLowerCase()) || 
-              data.BANK.toLowerCase().includes(b.name.toLowerCase()))
+            const matchingBank = banks.find(b =>
+              (b.name && data.BANK) && (b.name.toLowerCase().includes(data.BANK.toLowerCase()) ||
+                data.BANK.toLowerCase().includes(b.name.toLowerCase()))
             );
             if (matchingBank) {
               matchedBankId = matchingBank.id;
@@ -1067,7 +1070,7 @@ const EmployeeForm: React.FC = () => {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 3 }}>
                   <Box sx={{ position: 'relative' }}>
                     <Avatar
-                      src={photoPreview || (typeof employee.photoPath === 'string' && employee.photoPath 
+                      src={photoPreview || (typeof employee.photoPath === 'string' && employee.photoPath
                         ? getPublicUrl(employee.photoPath)
                         : undefined)}
                       sx={{ width: 120, height: 120, border: '3px solid #e0e0e0' }}
@@ -1690,13 +1693,14 @@ const EmployeeForm: React.FC = () => {
                 <Typography variant="h6" gutterBottom>Documents</Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Upload employee documents (Aadhar, PAN, etc.).</Typography>
                 <Box sx={{ border: '2px dashed #ccc', borderRadius: 2, p: 3, backgroundColor: '#f9f9f9' }}>
-                  <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={12} md={3}>
-                      <FormControl fullWidth>
-                        <InputLabel>Document Type</InputLabel>
+                  <Grid container spacing={2.5} alignItems="center">
+                    <Grid item xs={12} sm={6} md={3.5}>
+                      <FormControl fullWidth sx={{ minWidth: 160 }}>
+                        <InputLabel id="doc-type-label">Doc Type</InputLabel>
                         <Select
+                          labelId="doc-type-label"
                           value={documentTypeId}
-                          label="Document Type"
+                          label="Doc Type"
                           onChange={e => {
                             console.log('📄 Document type selected:', e.target.value);
                             console.log('📄 Available document types:', documentTypes);
@@ -1716,16 +1720,16 @@ const EmployeeForm: React.FC = () => {
                         </Select>
                       </FormControl>
                     </Grid>
-                    <Grid item xs={12} md={3}>
+                    <Grid item xs={12} sm={6} md={3.5}>
                       <TextField fullWidth label="Reference" value={documentReference} onChange={e => setDocumentReference(e.target.value)} placeholder="Enter reference" />
                     </Grid>
-                    <Grid item xs={12} md={3}>
-                      <Button variant="outlined" component="label" fullWidth sx={{ py: 1.5 }}>
+                    <Grid item xs={12} sm={6} md={2.5}>
+                      <Button variant="outlined" component="label" fullWidth sx={{ py: 1.5, whiteSpace: 'nowrap' }}>
                         {selectedFile ? 'Change File' : 'Select File'}
                         <input type="file" hidden onChange={handleFileSelect} />
                       </Button>
                     </Grid>
-                    <Grid item xs={12} md={3}>
+                    <Grid item xs={12} sm={6} md={2.5}>
                       {isEdit ? (
                         <Button
                           type="button"
@@ -1734,7 +1738,7 @@ const EmployeeForm: React.FC = () => {
                           disabled={!selectedFile || !documentTypeId || uploading}
                           onClick={handleUploadDocument}
                           fullWidth
-                          sx={{ py: 1.5 }}
+                          sx={{ py: 1.5, whiteSpace: 'nowrap' }}
                         >
                           {uploading ? 'Uploading...' : 'Upload'}
                         </Button>
@@ -1746,7 +1750,7 @@ const EmployeeForm: React.FC = () => {
                           disabled={!selectedFile || !documentTypeId}
                           onClick={handleAddDocumentToStage}
                           fullWidth
-                          sx={{ py: 1.5 }}
+                          sx={{ py: 1.5, whiteSpace: 'nowrap' }}
                         >
                           Add Document
                         </Button>
