@@ -29,7 +29,8 @@ import {
   TableRow,
   Tooltip,
   Checkbox,
-
+  CircularProgress,
+  InputAdornment,
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -325,6 +326,16 @@ const EmployeeForm: React.FC = () => {
     }));
   };
 
+  const handleMobileChange = (field: 'mobile' | 'alternateNumber' | 'emergencyContactNumber') => (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const value = event.target.value.replace(/\D/g, '').slice(0, 10);
+    setEmployee(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
   const handleDepartmentChange = (event: SelectChangeEvent<any>) => {
     const departmentId = parseInt(event.target.value as string, 10);
     setEmployee(prev => ({
@@ -366,6 +377,55 @@ const EmployeeForm: React.FC = () => {
         }
       } catch (error) {
         console.error('Error fetching IFSC details:', error);
+      }
+    }
+  };
+
+  const [pincodeLoading, setPincodeLoading] = useState(false);
+
+  const handlePincodeChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value.replace(/\D/g, '').slice(0, 6);
+    setEmployee(prev => ({ ...prev, pincode: value }));
+
+    if (value.length === 6) {
+      setPincodeLoading(true);
+      try {
+        const response = await fetch(`https://api.postalpincode.in/pincode/${value}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data[0] && data[0].Status === 'Success' && data[0].PostOffice && data[0].PostOffice.length > 0) {
+            const postOffice = data[0].PostOffice[0];
+            const city = postOffice.District || postOffice.Block || postOffice.Name || '';
+            const state = postOffice.State || '';
+
+            setEmployee(prev => ({
+              ...prev,
+              city: city || prev.city,
+              state: state || prev.state
+            }));
+
+            setSnackbar({
+              open: true,
+              message: `Address details fetched: ${city ? city + ', ' : ''}${state}`,
+              severity: 'success'
+            });
+          } else {
+            setSnackbar({
+              open: true,
+              message: 'Invalid Pincode or no records found',
+              severity: 'warning'
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching pincode details:', error);
+        setSnackbar({
+          open: true,
+          message: 'Failed to fetch details for this pincode',
+          severity: 'error'
+        });
+      } finally {
+        setPincodeLoading(false);
       }
     }
   };
@@ -727,9 +787,15 @@ const EmployeeForm: React.FC = () => {
     if (employee.workEmail && !emailRegex.test(employee.workEmail)) {
       errors.push('Please enter a valid work email address');
     }
-    const mobileRegex = /^[0-9]{10,15}$/;
+    const mobileRegex = /^[0-9]{10}$/;
     if (employee.mobile && !mobileRegex.test(employee.mobile)) {
-      errors.push('Please enter a valid mobile number (10-15 digits)');
+      errors.push('Please enter a valid 10-digit mobile number');
+    }
+    if (employee.alternateNumber && !mobileRegex.test(employee.alternateNumber)) {
+      errors.push('Please enter a valid 10-digit alternate number');
+    }
+    if (employee.emergencyContactNumber && !mobileRegex.test(employee.emergencyContactNumber)) {
+      errors.push('Please enter a valid 10-digit emergency contact number');
     }
     return errors;
   };
@@ -1135,7 +1201,16 @@ const EmployeeForm: React.FC = () => {
                 </LocalizationProvider>
               </Grid>
               <Grid item xs={12} md={4}>
-                <TextField fullWidth label="Mobile Number" required value={employee.mobile} onChange={handleInputChange('mobile')} />
+                <TextField
+                  fullWidth
+                  label="Mobile Number *"
+                  required
+                  value={employee.mobile || ''}
+                  onChange={handleMobileChange('mobile')}
+                  inputProps={{ maxLength: 10, inputMode: 'numeric', pattern: '[0-9]*' }}
+                  error={Boolean(employee.mobile && employee.mobile.length > 0 && employee.mobile.length !== 10)}
+                  helperText={employee.mobile && employee.mobile.length > 0 && employee.mobile.length !== 10 ? 'Mobile number must be 10 digits' : ''}
+                />
               </Grid>
               <Grid item xs={12} md={6}>
                 <TextField fullWidth label="Email" type="email" value={employee.email || ''} onChange={handleInputChange('email')} />
@@ -1153,7 +1228,21 @@ const EmployeeForm: React.FC = () => {
                 <TextField fullWidth label="State" value={employee.state || ''} onChange={handleInputChange('state')} />
               </Grid>
               <Grid item xs={12} md={4}>
-                <TextField fullWidth label="Pincode" value={employee.pincode || ''} onChange={handleInputChange('pincode')} />
+                <TextField
+                  fullWidth
+                  label="Pincode"
+                  value={employee.pincode || ''}
+                  onChange={handlePincodeChange}
+                  inputProps={{ maxLength: 6 }}
+                  InputProps={{
+                    endAdornment: pincodeLoading ? (
+                      <InputAdornment position="end">
+                        <CircularProgress size={20} />
+                      </InputAdornment>
+                    ) : null,
+                  }}
+                  helperText={pincodeLoading ? 'Fetching city & state...' : ''}
+                />
               </Grid>
 
               {/* Enhanced Profile Fields */}
@@ -1163,7 +1252,15 @@ const EmployeeForm: React.FC = () => {
               </Grid>
 
               <Grid item xs={12} md={6}>
-                <TextField fullWidth label="Alternate Number" value={employee.alternateNumber || ''} onChange={handleInputChange('alternateNumber')} />
+                <TextField
+                  fullWidth
+                  label="Alternate Number"
+                  value={employee.alternateNumber || ''}
+                  onChange={handleMobileChange('alternateNumber')}
+                  inputProps={{ maxLength: 10, inputMode: 'numeric', pattern: '[0-9]*' }}
+                  error={Boolean(employee.alternateNumber && employee.alternateNumber.length > 0 && employee.alternateNumber.length !== 10)}
+                  helperText={employee.alternateNumber && employee.alternateNumber.length > 0 && employee.alternateNumber.length !== 10 ? 'Alternate number must be 10 digits' : ''}
+                />
               </Grid>
               <Grid item xs={12} md={6}>
                 <FormControl fullWidth>
@@ -1192,7 +1289,15 @@ const EmployeeForm: React.FC = () => {
                 <TextField fullWidth label="Emergency Contact Name" value={employee.emergencyContactName || ''} onChange={handleInputChange('emergencyContactName')} />
               </Grid>
               <Grid item xs={12} md={4}>
-                <TextField fullWidth label="Emergency Contact Number" value={employee.emergencyContactNumber || ''} onChange={handleInputChange('emergencyContactNumber')} />
+                <TextField
+                  fullWidth
+                  label="Emergency Contact Number"
+                  value={employee.emergencyContactNumber || ''}
+                  onChange={handleMobileChange('emergencyContactNumber')}
+                  inputProps={{ maxLength: 10, inputMode: 'numeric', pattern: '[0-9]*' }}
+                  error={Boolean(employee.emergencyContactNumber && employee.emergencyContactNumber.length > 0 && employee.emergencyContactNumber.length !== 10)}
+                  helperText={employee.emergencyContactNumber && employee.emergencyContactNumber.length > 0 && employee.emergencyContactNumber.length !== 10 ? 'Emergency contact number must be 10 digits' : ''}
+                />
               </Grid>
               <Grid item xs={12} md={4}>
                 <TextField fullWidth label="Relationship" value={employee.emergencyContactRelation || ''} onChange={handleInputChange('emergencyContactRelation')} />

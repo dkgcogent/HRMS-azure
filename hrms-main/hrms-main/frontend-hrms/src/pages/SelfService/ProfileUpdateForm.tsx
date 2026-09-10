@@ -16,6 +16,8 @@ import {
   Alert,
   Snackbar,
   Divider,
+  CircularProgress,
+  InputAdornment,
 } from '@mui/material';
 import {
   Save as SaveIcon,
@@ -171,6 +173,60 @@ const ProfileUpdateForm: React.FC = () => {
     }));
   };
 
+  const handleMobileChange = (field: 'mobile' | 'alternateNumber' | 'emergencyContactNumber') => (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const value = event.target.value.replace(/\D/g, '').slice(0, 10);
+    setProfile(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const [pincodeLoading, setPincodeLoading] = useState(false);
+
+  const handlePincodeChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value.replace(/\D/g, '').slice(0, 6);
+    setProfile(prev => ({ ...prev, pincode: value }));
+
+    if (value.length === 6) {
+      setPincodeLoading(true);
+      try {
+        const response = await fetch(`https://api.postalpincode.in/pincode/${value}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data[0] && data[0].Status === 'Success' && data[0].PostOffice && data[0].PostOffice.length > 0) {
+            const postOffice = data[0].PostOffice[0];
+            const city = postOffice.District || postOffice.Block || postOffice.Name || '';
+            const state = postOffice.State || '';
+
+            setProfile(prev => ({
+              ...prev,
+              city: city || prev.city,
+              state: state || prev.state
+            }));
+
+            setSnackbar({
+              open: true,
+              message: `Address details fetched: ${city ? city + ', ' : ''}${state}`,
+              severity: 'success'
+            });
+          } else {
+            setSnackbar({
+              open: true,
+              message: 'Invalid Pincode or no records found',
+              severity: 'warning'
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching pincode details:', error);
+      } finally {
+        setPincodeLoading(false);
+      }
+    }
+  };
+
   const validateForm = () => {
     const errors: string[] = [];
 
@@ -185,13 +241,17 @@ const ProfileUpdateForm: React.FC = () => {
     if (!profile.emergencyContactNumber?.trim()) errors.push('Emergency Contact Number is required');
 
     // Mobile validation
-    const mobileRegex = /^[0-9]{10,15}$/;
+    const mobileRegex = /^[0-9]{10}$/;
     if (profile.mobile && !mobileRegex.test(profile.mobile)) {
-      errors.push('Please enter a valid mobile number');
+      errors.push('Please enter a valid 10-digit mobile number');
+    }
+
+    if (profile.alternateNumber && !mobileRegex.test(profile.alternateNumber)) {
+      errors.push('Please enter a valid 10-digit alternate number');
     }
 
     if (profile.emergencyContactNumber && !mobileRegex.test(profile.emergencyContactNumber)) {
-      errors.push('Please enter a valid emergency contact number');
+      errors.push('Please enter a valid 10-digit emergency contact number');
     }
 
     return errors;
@@ -378,8 +438,11 @@ const ProfileUpdateForm: React.FC = () => {
                 label="Mobile Number"
                 required
                 value={profile.mobile}
-                onChange={handleInputChange('mobile')}
+                onChange={handleMobileChange('mobile')}
+                inputProps={{ maxLength: 10, inputMode: 'numeric', pattern: '[0-9]*' }}
                 InputProps={{ readOnly: !editMode }}
+                error={Boolean(profile.mobile && profile.mobile.length > 0 && profile.mobile.length !== 10)}
+                helperText={editMode && profile.mobile && profile.mobile.length !== 10 ? 'Mobile number must be 10 digits' : ''}
                 variant={editMode ? "outlined" : "standard"}
               />
             </Grid>
@@ -393,8 +456,11 @@ const ProfileUpdateForm: React.FC = () => {
                 fullWidth
                 label="Alternate Number"
                 value={profile.alternateNumber || ''}
-                onChange={handleInputChange('alternateNumber')}
+                onChange={handleMobileChange('alternateNumber')}
+                inputProps={{ maxLength: 10, inputMode: 'numeric', pattern: '[0-9]*' }}
                 InputProps={{ readOnly: !editMode }}
+                error={Boolean(profile.alternateNumber && profile.alternateNumber.length > 0 && profile.alternateNumber.length !== 10)}
+                helperText={editMode && profile.alternateNumber && profile.alternateNumber.length !== 10 ? 'Alternate number must be 10 digits' : ''}
                 variant={editMode ? "outlined" : "standard"}
               />
             </Grid>
@@ -585,8 +651,17 @@ const ProfileUpdateForm: React.FC = () => {
                 label="Pincode"
                 required
                 value={profile.pincode}
-                onChange={handleInputChange('pincode')}
-                InputProps={{ readOnly: !editMode }}
+                onChange={handlePincodeChange}
+                inputProps={{ maxLength: 6 }}
+                InputProps={{
+                  readOnly: !editMode,
+                  endAdornment: pincodeLoading ? (
+                    <InputAdornment position="end">
+                      <CircularProgress size={20} />
+                    </InputAdornment>
+                  ) : null,
+                }}
+                helperText={pincodeLoading ? 'Fetching city & state...' : ''}
                 variant={editMode ? "outlined" : "standard"}
               />
             </Grid>
@@ -625,8 +700,11 @@ const ProfileUpdateForm: React.FC = () => {
                 label="Emergency Contact Number"
                 required
                 value={profile.emergencyContactNumber}
-                onChange={handleInputChange('emergencyContactNumber')}
+                onChange={handleMobileChange('emergencyContactNumber')}
+                inputProps={{ maxLength: 10, inputMode: 'numeric', pattern: '[0-9]*' }}
                 InputProps={{ readOnly: !editMode }}
+                error={Boolean(profile.emergencyContactNumber && profile.emergencyContactNumber.length > 0 && profile.emergencyContactNumber.length !== 10)}
+                helperText={editMode && profile.emergencyContactNumber && profile.emergencyContactNumber.length !== 10 ? 'Emergency contact number must be 10 digits' : ''}
                 variant={editMode ? "outlined" : "standard"}
               />
             </Grid>

@@ -25,6 +25,8 @@ import {
   RadioGroup,
   FormControlLabel,
   Radio,
+  CircularProgress,
+  InputAdornment,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -100,6 +102,43 @@ const WorkLocationList: React.FC = () => {
       isActive: location.isActive,
     });
     setOpen(true);
+  };
+
+  const [pincodeLoading, setPincodeLoading] = useState(false);
+
+  const handlePincodeChange = async (value: string) => {
+    const cleanValue = value.replace(/\D/g, '').slice(0, 6);
+    setFormData(prev => ({ ...prev, pincode: cleanValue }));
+
+    if (cleanValue.length === 6) {
+      setPincodeLoading(true);
+      try {
+        const response = await fetch(`https://api.postalpincode.in/pincode/${cleanValue}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data[0] && data[0].Status === 'Success' && data[0].PostOffice && data[0].PostOffice.length > 0) {
+            const postOffice = data[0].PostOffice[0];
+            const city = postOffice.District || postOffice.Block || postOffice.Name || '';
+            const state = postOffice.State || '';
+
+            setFormData(prev => ({
+              ...prev,
+              city: city || prev.city,
+              state: state || prev.state
+            }));
+            setSnackbar({
+              open: true,
+              message: `Location details fetched: ${city ? city + ', ' : ''}${state}`,
+              severity: 'success'
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching pincode details:', error);
+      } finally {
+        setPincodeLoading(false);
+      }
+    }
   };
 
   const validateForm = () => {
@@ -284,7 +323,16 @@ const WorkLocationList: React.FC = () => {
             <TextField
               label="Pincode"
               value={formData.pincode}
-              onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
+              onChange={(e) => handlePincodeChange(e.target.value)}
+              inputProps={{ maxLength: 6 }}
+              InputProps={{
+                endAdornment: pincodeLoading ? (
+                  <InputAdornment position="end">
+                    <CircularProgress size={20} />
+                  </InputAdornment>
+                ) : null,
+              }}
+              helperText={pincodeLoading ? 'Fetching city & state...' : ''}
               fullWidth
               required
             />
