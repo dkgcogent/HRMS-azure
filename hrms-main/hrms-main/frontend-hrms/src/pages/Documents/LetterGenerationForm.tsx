@@ -846,19 +846,23 @@ const LetterGenerationForm: React.FC = () => {
                       <Box sx={{ mt: 1, mb: 2, p: 2, bgcolor: '#f5f7ff', borderRadius: 3, border: '1px solid rgba(30, 60, 114, 0.08)' }}>
                         <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#1e3c72', mb: 1, fontSize: '0.875rem' }}>Calculator Summary</Typography>
                         <Grid container spacing={1.5}>
-                          <Grid item xs={6}>
+                          <Grid item xs={6} sm={4}>
                             <Typography variant="caption" color="text.secondary" display="block">Gross (Monthly)</Typography>
                             <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>₹ {calcs.grossMonth.toLocaleString('en-IN')}</Typography>
                           </Grid>
-                          <Grid item xs={6}>
-                            <Typography variant="caption" color="text.secondary" display="block">Gross (Yearly)</Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>₹ {calcs.grossYear.toLocaleString('en-IN')}</Typography>
-                          </Grid>
-                          <Grid item xs={6}>
+                          <Grid item xs={6} sm={4}>
                             <Typography variant="caption" color="text.secondary" display="block">Take Home (Monthly)</Typography>
                             <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.main', fontSize: '0.875rem' }}>₹ {calcs.takeHomeMonth.toLocaleString('en-IN')}</Typography>
                           </Grid>
-                          <Grid item xs={6}>
+                          <Grid item xs={6} sm={4}>
+                            <Typography variant="caption" color="text.secondary" display="block">Monthly CTC</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'info.main', fontSize: '0.875rem' }}>₹ {calcs.totalCtcMonth.toLocaleString('en-IN')}</Typography>
+                          </Grid>
+                          <Grid item xs={6} sm={6}>
+                            <Typography variant="caption" color="text.secondary" display="block">Gross (Yearly)</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: '0.875rem' }}>₹ {calcs.grossYear.toLocaleString('en-IN')}</Typography>
+                          </Grid>
+                          <Grid item xs={6} sm={6}>
                             <Typography variant="caption" color="text.secondary" display="block">Total CTC (Yearly)</Typography>
                             <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'primary.main', fontSize: '0.875rem' }}>₹ {calcs.totalCtcYear.toLocaleString('en-IN')}</Typography>
                           </Grid>
