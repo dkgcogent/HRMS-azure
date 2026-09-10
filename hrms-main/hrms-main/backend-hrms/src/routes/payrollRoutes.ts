@@ -15,6 +15,16 @@ import {
   deletePayslip,
   getPayslipsByEmployee
 } from '../controllers/payslipController';
+import {
+  getPaymentSheets,
+  getPaymentSheetById,
+  createOrUpdatePaymentSheet,
+  updatePaymentSheetById,
+  sendForApproval,
+  approvePaymentSheet,
+  rejectPaymentSheet,
+  deletePaymentSheet
+} from '../controllers/paymentSheetController';
 import { generatePayslipPdf } from '../utils/payslipPdfGenerator';
 
 const router = express.Router();
@@ -26,6 +36,16 @@ router.post('/components', createSalaryComponent);
 // Employee Salary Routes
 router.get('/employee-salary/:employeeId', getEmployeeSalary);
 router.put('/employee-salary', updateEmployeeSalary); // Use PUT for upsert
+
+// Payment Sheet Routes
+router.get('/payment-sheets', getPaymentSheets);
+router.get('/payment-sheets/:id', getPaymentSheetById);
+router.post('/payment-sheets', createOrUpdatePaymentSheet);
+router.put('/payment-sheets/:id', updatePaymentSheetById);
+router.post('/payment-sheets/:id/send-approval', sendForApproval);
+router.post('/payment-sheets/:id/approve', approvePaymentSheet);
+router.post('/payment-sheets/:id/reject', rejectPaymentSheet);
+router.delete('/payment-sheets/:id', deletePaymentSheet);
 
 // Payslip Routes
 router.get('/', getAllPayslips);

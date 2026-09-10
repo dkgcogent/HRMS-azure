@@ -442,6 +442,31 @@ export async function ensureCoreTables() {
   `).catch((error: any) => {
     console.warn('Note: employee_qualifications table creation:', error.message);
   });
+
+  // hrms_payment_sheets table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS hrms_payment_sheets (
+      id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      month_str VARCHAR(50) NOT NULL,
+      start_date DATE NOT NULL,
+      end_date DATE NOT NULL,
+      status ENUM('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED') NOT NULL DEFAULT 'DRAFT',
+      sent_date DATE NULL,
+      sent_by INT NULL,
+      approved_by INT NULL,
+      approved_date DATE NULL,
+      total_employees INT DEFAULT 0,
+      total_gross DECIMAL(15,2) DEFAULT 0,
+      total_net DECIMAL(15,2) DEFAULT 0,
+      sheet_data LONGTEXT NULL,
+      notes TEXT NULL,
+      created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `).catch((error: any) => {
+    console.warn('Note: payment_sheets table creation:', error.message);
+  });
 }
+
 
 
